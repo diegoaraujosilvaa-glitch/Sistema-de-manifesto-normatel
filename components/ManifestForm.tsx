@@ -26,7 +26,7 @@ interface ManifestFormProps {
   checkers: Checker[];
   branches: Branch[];
   cds: DistributionCenter[];
-  onSave: (manifest: Manifest) => void;
+  onSave: (manifest: Omit<Manifest, 'id'>) => void;
   currentUser: { name: string; uid: string };
 }
 
@@ -90,12 +90,11 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
     return null;
   };
 
-  const constructManifest = (): Manifest => {
+  const constructManifest = (): Omit<Manifest, 'id'> => {
     const cd = cds.find(c => c.id === formData.cdId);
     const branch = branches.find(b => b.id === formData.branchId);
     const checker = checkers.find(c => c.id === formData.checkerId);
     return {
-      id: Math.random().toString(36).substr(2, 9),
       ...formData,
       status: 'PENDENTE',
       createdAt: new Date().toISOString(),
@@ -113,7 +112,9 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
     setIsGenerating(true);
     try {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      const manifest = constructManifest();
+      const manifestData = constructManifest();
+      // For preview, we add a dummy ID
+      const manifest = { ...manifestData, id: 'preview' } as Manifest;
       const url = await generateManifestPDF(manifest, true);
       setPreviewUrl(url);
       setIsPreviewing(true);
@@ -127,9 +128,11 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
     setError(null);
     setIsGenerating(true);
     try {
-      const manifest = constructManifest();
+      const manifestData = constructManifest();
+      // For PDF generation, we add a dummy ID if needed, but generateManifestPDF should handle it
+      const manifest = { ...manifestData, id: 'temp' } as Manifest;
       await generateManifestPDF(manifest, false);
-      onSave(manifest);
+      onSave(manifestData);
       setFormData({ 
         ...formData, 
         manifestNumber: '', 

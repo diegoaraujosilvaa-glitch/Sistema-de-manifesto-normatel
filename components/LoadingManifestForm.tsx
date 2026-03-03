@@ -35,7 +35,7 @@ interface LoadingManifestFormProps {
   branches: Branch[];
   cds: DistributionCenter[];
   pendingManifests: Manifest[];
-  onSave: (m: LoadingManifest) => void;
+  onSave: (m: Omit<LoadingManifest, 'id'>) => void;
   currentUser: { name: string; uid: string };
 }
 
@@ -136,13 +136,12 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
     return null;
   };
 
-  const constructManifest = (): LoadingManifest => {
+  const constructManifest = (): Omit<LoadingManifest, 'id'> => {
     const cd = cds.find(c => c.id === formData.cdId);
     const branch = branches.find(b => b.id === formData.branchId);
     const driver = drivers.find(d => d.id === formData.driverId);
     const vehicle = vehicles.find(v => v.id === formData.vehicleId);
     return {
-      id: `lm_${Date.now()}`,
       ...formData,
       linkedManifestIds: selectedManifestIds,
       invoices,
@@ -162,7 +161,8 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
     setIsGenerating(true);
     try {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      const m = constructManifest();
+      const manifestData = constructManifest();
+      const m = { ...manifestData, id: 'preview' } as LoadingManifest;
       const url = await generateLoadingManifestPDF(m, true);
       setPreviewUrl(url);
     } catch (e) { setError("Erro ao gerar PDF."); }
@@ -174,9 +174,10 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
     if (err) { setError(err); return; }
     setIsGenerating(true);
     try {
-      const m = constructManifest();
+      const manifestData = constructManifest();
+      const m = { ...manifestData, id: 'temp' } as LoadingManifest;
       await generateLoadingManifestPDF(m, false);
-      onSave(m);
+      onSave(manifestData);
       setInvoices([]);
       setSelectedManifestIds([]);
       setFormData({ ...formData, manifestNumber: `MC-${Date.now().toString().substr(-6)}`, sealNumber: '', exitTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) });

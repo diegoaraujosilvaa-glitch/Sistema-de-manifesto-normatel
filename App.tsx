@@ -41,14 +41,35 @@ import {
   X,
   Building2,
   PlusCircle,
-  UserCheck
+  UserCheck,
+  Loader2
 } from 'lucide-react';
 import { generateManifestPDF, generateLoadingManifestPDF } from './services/pdfGenerator';
 import { 
   subscribeToManifests, 
   subscribeToLoadingManifests, 
   saveManifest, 
-  saveLoadingManifest 
+  saveLoadingManifest,
+  subscribeToCheckers,
+  subscribeToDrivers,
+  subscribeToVehicles,
+  subscribeToBranches,
+  subscribeToCDs,
+  saveChecker,
+  saveDriver,
+  saveVehicle,
+  saveBranch,
+  saveCD,
+  deleteChecker,
+  deleteDriver,
+  deleteVehicle,
+  deleteBranch,
+  deleteCD,
+  deleteManifest,
+  deleteLoadingManifest,
+  subscribeToUsers,
+  saveUser,
+  deleteUser
 } from './services/firestoreService';
 
 const LogoNormatel = ({ size = 40, className = "" }) => (
@@ -67,54 +88,37 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem('logi_all_users');
-    const defaultAdmin: UserProfile = { 
-      uid: 'u_diego', 
-      email: 'diego.silva', 
-      name: 'Diego Silva', 
-      role: 'ADMIN', 
-      password: '05171888302' 
-    };
-    return saved ? JSON.parse(saved) : [defaultAdmin];
-  });
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
 
   const [manifests, setManifests] = useState<Manifest[]>([]);
   const [loadingManifests, setLoadingManifests] = useState<LoadingManifest[]>([]);
+  const [checkers, setCheckers] = useState<Checker[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [cds, setCds] = useState<DistributionCenter[]>([]);
 
   useEffect(() => {
     const unsubManifests = subscribeToManifests(setManifests);
     const unsubLoading = subscribeToLoadingManifests(setLoadingManifests);
+    const unsubCheckers = subscribeToCheckers(setCheckers);
+    const unsubDrivers = subscribeToDrivers(setDrivers);
+    const unsubVehicles = subscribeToVehicles(setVehicles);
+    const unsubBranches = subscribeToBranches(setBranches);
+    const unsubCDs = subscribeToCDs(setCds);
+    const unsubUsers = subscribeToUsers(setAllUsers);
+
     return () => {
       unsubManifests();
       unsubLoading();
+      unsubCheckers();
+      unsubDrivers();
+      unsubVehicles();
+      unsubBranches();
+      unsubCDs();
+      unsubUsers();
     };
   }, []);
-
-  const [checkers, setCheckers] = useState<Checker[]>(() => {
-    const saved = localStorage.getItem('logi_checkers');
-    return saved ? JSON.parse(saved) : INITIAL_CHECKERS;
-  });
-
-  const [drivers, setDrivers] = useState<Driver[]>(() => {
-    const saved = localStorage.getItem('logi_drivers');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
-    const saved = localStorage.getItem('logi_vehicles_v3');
-    return saved ? JSON.parse(saved) : INITIAL_VEHICLES;
-  });
-
-  const [branches, setBranches] = useState<Branch[]>(() => {
-    const saved = localStorage.getItem('logi_branches_v2');
-    return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
-  });
-
-  const [cds, setCds] = useState<DistributionCenter[]>(() => {
-    const saved = localStorage.getItem('logi_cds_v2');
-    return saved ? JSON.parse(saved) : INITIAL_CDS;
-  });
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -127,6 +131,57 @@ const App: React.FC = () => {
   
   // UI Control States
   const [showForm, setShowForm] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const seedDatabase = async () => {
+    if (confirm('Deseja popular o banco de dados com os dados iniciais?')) {
+      setIsSeeding(true);
+      try {
+        // Seed Checkers
+        if (checkers.length === 0) {
+          for (const c of INITIAL_CHECKERS) {
+            const { id, ...data } = c;
+            await saveChecker(data);
+          }
+        }
+        // Seed Branches
+        if (branches.length === 0) {
+          for (const b of INITIAL_BRANCHES) {
+            const { id, ...data } = b;
+            await saveBranch(data);
+          }
+        }
+        // Seed CDs
+        if (cds.length === 0) {
+          for (const c of INITIAL_CDS) {
+            const { id, ...data } = c;
+            await saveCD(data);
+          }
+        }
+        // Seed Vehicles
+        if (vehicles.length === 0) {
+          for (const v of INITIAL_VEHICLES) {
+            const { id, ...data } = v;
+            await saveVehicle(data);
+          }
+        }
+        // Seed Default Admin if no users
+        if (allUsers.length === 0) {
+          await saveUser({
+            email: 'diego.silva',
+            name: 'Diego Silva',
+            role: 'ADMIN',
+            password: '05171888302'
+          });
+        }
+        alert('Banco de dados populado com sucesso!');
+      } catch (e) {
+        alert('Erro ao popular banco de dados');
+      } finally {
+        setIsSeeding(false);
+      }
+    }
+  };
 
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'CONFERENTE' as UserProfile['role'] });
   const [newChecker, setNewChecker] = useState({ name: '', externalId: '' });
@@ -136,11 +191,6 @@ const App: React.FC = () => {
   const [newCD, setNewCD] = useState({ name: '', code: '' });
 
   useEffect(() => { localStorage.setItem('logi_all_users', JSON.stringify(allUsers)); }, [allUsers]);
-  useEffect(() => { localStorage.setItem('logi_checkers', JSON.stringify(checkers)); }, [checkers]);
-  useEffect(() => { localStorage.setItem('logi_drivers', JSON.stringify(drivers)); }, [drivers]);
-  useEffect(() => { localStorage.setItem('logi_vehicles_v3', JSON.stringify(vehicles)); }, [vehicles]);
-  useEffect(() => { localStorage.setItem('logi_branches_v2', JSON.stringify(branches)); }, [branches]);
-  useEffect(() => { localStorage.setItem('logi_cds_v2', JSON.stringify(cds)); }, [cds]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,52 +208,80 @@ const App: React.FC = () => {
 
   const handleLogout = () => { setUser(null); localStorage.removeItem('logi_user'); };
 
-  const addUser = () => {
+  const addUser = async () => {
     if (newUser.name && newUser.email && newUser.password) {
-      const u: UserProfile = { uid: `u_${Date.now()}`, name: newUser.name, email: newUser.email, password: newUser.password, role: newUser.role };
-      setAllUsers([...allUsers, u]);
-      setNewUser({ name: '', email: '', password: '', role: 'CONFERENTE' });
-      setShowForm(false);
+      try {
+        await saveUser({ 
+          name: newUser.name, 
+          email: newUser.email, 
+          password: newUser.password, 
+          role: newUser.role 
+        });
+        setNewUser({ name: '', email: '', password: '', role: 'CONFERENTE' });
+        setShowForm(false);
+      } catch (e) {
+        alert('Erro ao salvar usuário no Firebase');
+      }
     }
   };
 
-  const addChecker = () => {
+  const addChecker = async () => {
     if (newChecker.name) {
-      setCheckers([...checkers, { id: `c_${Date.now()}`, ...newChecker, status: 'ATIVO' }]);
-      setNewChecker({ name: '', externalId: '' });
-      setShowForm(false);
+      try {
+        await saveChecker({ ...newChecker, status: 'ATIVO' });
+        setNewChecker({ name: '', externalId: '' });
+        setShowForm(false);
+      } catch (e) {
+        alert('Erro ao salvar conferente');
+      }
     }
   };
 
-  const addDriver = () => {
+  const addDriver = async () => {
     if (newDriver.name && newDriver.document) {
-      setDrivers([...drivers, { id: `d_${Date.now()}`, ...newDriver, status: 'ATIVO' }]);
-      setNewDriver({ name: '', document: '', phone: '' });
-      setShowForm(false);
+      try {
+        await saveDriver({ ...newDriver, status: 'ATIVO' });
+        setNewDriver({ name: '', document: '', phone: '' });
+        setShowForm(false);
+      } catch (e) {
+        alert('Erro ao salvar motorista');
+      }
     }
   };
 
-  const addVehicle = () => {
+  const addVehicle = async () => {
     if (newVehicle.plate) {
-      setVehicles([...vehicles, { id: `v_${Date.now()}`, ...newVehicle, status: 'ATIVO' }]);
-      setNewVehicle({ plate: '', model: '', type: 'TRUCK' });
-      setShowForm(false);
+      try {
+        await saveVehicle({ ...newVehicle, status: 'ATIVO' });
+        setNewVehicle({ plate: '', model: '', type: 'TRUCK' });
+        setShowForm(false);
+      } catch (e) {
+        alert('Erro ao salvar veículo');
+      }
     }
   };
 
-  const addBranch = () => {
+  const addBranch = async () => {
     if (newBranch.name && newBranch.code) {
-      setBranches([...branches, { id: `b_${Date.now()}`, ...newBranch, status: 'ATIVO' }]);
-      setNewBranch({ name: '', code: '', city: '', state: '' });
-      setShowForm(false);
+      try {
+        await saveBranch({ ...newBranch, status: 'ATIVO' });
+        setNewBranch({ name: '', code: '', city: '', state: '' });
+        setShowForm(false);
+      } catch (e) {
+        alert('Erro ao salvar filial');
+      }
     }
   };
 
-  const addCD = () => {
+  const addCD = async () => {
     if (newCD.name && newCD.code) {
-      setCds([...cds, { id: `cd_${Date.now()}`, ...newCD }]);
-      setNewCD({ name: '', code: '' });
-      setShowForm(false);
+      try {
+        await saveCD(newCD);
+        setNewCD({ name: '', code: '' });
+        setShowForm(false);
+      } catch (e) {
+        alert('Erro ao salvar CD');
+      }
     }
   };
 
@@ -360,7 +438,15 @@ const App: React.FC = () => {
                       <td className="p-6 text-center">
                         <div className="flex justify-center gap-2">
                           <button onClick={() => generateManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors" title="Imprimir Etiquetas"><Printer size={18}/></button>
-                          <button onClick={() => setManifests(manifests.filter(x => x.id !== m.id))} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                          <button onClick={async () => {
+                            if (confirm('Deseja excluir este manifesto?')) {
+                              try {
+                                await deleteManifest(m.id);
+                              } catch (e) {
+                                alert('Erro ao excluir manifesto');
+                              }
+                            }
+                          }} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
                         </div>
                       </td>
                     </tr>
@@ -424,7 +510,15 @@ const App: React.FC = () => {
                         <td className="p-6 flex items-center gap-3"><div className="w-10 h-10 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center"><User size={20} /></div><span className="font-black text-slate-800 uppercase tracking-tighter text-sm">{u.name}</span></td>
                         <td className="p-6 text-slate-500 font-mono text-sm">{u.email}</td>
                         <td className="p-6"><span className={`px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase ${u.role === 'ADMIN' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>{u.role}</span></td>
-                        <td className="p-6 text-center">{u.uid !== user.uid && u.uid !== 'u_diego' && (<button onClick={() => setAllUsers(allUsers.filter(x => x.uid !== u.uid))} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>)}</td>
+                        <td className="p-6 text-center">{u.uid !== user.uid && u.email !== 'diego.silva' && (<button onClick={async () => {
+                          if (confirm('Deseja excluir este usuário?')) {
+                            try {
+                              await deleteUser(u.uid);
+                            } catch (e) {
+                              alert('Erro ao excluir usuário');
+                            }
+                          }
+                        }} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>)}</td>
                       </tr>
                     ))}</tbody>
                </table>
@@ -473,7 +567,15 @@ const App: React.FC = () => {
                     <h4 className="font-black text-slate-800 uppercase tracking-tighter text-sm mb-4 leading-tight">{c.name}</h4>
                     <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-50">
                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Unidade Operacional</span>
-                       <button onClick={() => setCds(cds.filter(x => x.id !== c.id))} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                       <button onClick={async () => {
+                         if (confirm('Deseja excluir este CD?')) {
+                           try {
+                             await deleteCD(c.id);
+                           } catch (e) {
+                             alert('Erro ao excluir CD');
+                           }
+                         }
+                       }} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
                     </div>
                  </div>
                ))}
@@ -525,7 +627,15 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[8px] font-black uppercase tracking-widest mb-1">Ativo</span>
-                        <button onClick={() => setDrivers(drivers.filter(x => x.id !== d.id))} className="text-slate-300 hover:text-red-500 p-1"><Trash2 size={16}/></button>
+                        <button onClick={async () => {
+                          if (confirm('Deseja excluir este motorista?')) {
+                            try {
+                              await deleteDriver(d.id);
+                            } catch (e) {
+                              alert('Erro ao excluir motorista');
+                            }
+                          }
+                        }} className="text-slate-300 hover:text-red-500 p-1"><Trash2 size={16}/></button>
                       </div>
                    </div>
                    <h4 className="font-black text-slate-800 uppercase tracking-tighter text-lg leading-none mb-4">{d.name}</h4>
@@ -558,9 +668,16 @@ const App: React.FC = () => {
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Controle de frota e capacidade</p>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setVehicles(INITIAL_VEHICLES)} className="p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">
-                  Restaurar Padrão
-                </button>
+                {user.role === 'ADMIN' && (
+                  <button 
+                    onClick={seedDatabase} 
+                    disabled={isSeeding}
+                    className="p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all disabled:opacity-50"
+                  >
+                    {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <Settings2 size={18} />} 
+                    {isSeeding ? 'Populando...' : 'Popular Banco'}
+                  </button>
+                )}
                 <button onClick={() => setShowForm(!showForm)} className={`p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${showForm ? 'bg-slate-100 text-slate-500' : 'bg-orange-600 text-white shadow-lg shadow-orange-100'}`}>
                   {showForm ? <X size={18} /> : <Truck size={18}/>} {showForm ? 'Cancelar' : 'Novo Veículo'}
                 </button>
@@ -605,7 +722,17 @@ const App: React.FC = () => {
                         <td className="p-6"><div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg border-2 border-slate-700 font-mono font-bold text-base inline-block tracking-tighter shadow-sm">{v.plate}</div></td>
                         <td className="p-6"><span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase">{v.type}</span></td>
                         <td className="p-6 font-bold text-slate-700 uppercase text-sm">{v.model}</td>
-                        <td className="p-6 text-center"><button onClick={() => setVehicles(vehicles.filter(x => x.id !== v.id))} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={20}/></button></td>
+                        <td className="p-6 text-center">
+                          <button onClick={async () => {
+                            if (confirm('Deseja excluir este veículo?')) {
+                              try {
+                                await deleteVehicle(v.id);
+                              } catch (e) {
+                                alert('Erro ao excluir veículo');
+                              }
+                            }
+                          }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>
+                        </td>
                       </tr>
                     ))}</tbody>
                </table>
@@ -663,7 +790,15 @@ const App: React.FC = () => {
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{b.city} - {b.state}</p>
                     <div className="mt-6 flex justify-between items-center">
                        <span className="flex items-center gap-1 text-[8px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-2 py-0.5 rounded-full"><CheckCircle2 size={10} /> Operando</span>
-                       <button onClick={() => setBranches(branches.filter(x => x.id !== b.id))} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                       <button onClick={async () => {
+                         if (confirm('Deseja excluir esta filial?')) {
+                           try {
+                             await deleteBranch(b.id);
+                           } catch (e) {
+                             alert('Erro ao excluir filial');
+                           }
+                         }
+                       }} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
                     </div>
                  </div>
                ))}
@@ -734,7 +869,15 @@ const App: React.FC = () => {
                       <td className="p-6 text-center">
                         <div className="flex justify-center gap-2">
                           <button onClick={() => generateLoadingManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors" title="Imprimir Manifesto"><Printer size={18}/></button>
-                          <button onClick={() => setLoadingManifests(loadingManifests.filter(x => x.id !== m.id))} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                          <button onClick={async () => {
+                            if (confirm('Deseja excluir este embarque?')) {
+                              try {
+                                await deleteLoadingManifest(m.id);
+                              } catch (e) {
+                                alert('Erro ao excluir embarque');
+                              }
+                            }
+                          }} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
                         </div>
                       </td>
                     </tr>
@@ -776,7 +919,23 @@ const App: React.FC = () => {
             <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
                <table className="w-full text-left">
                   <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b tracking-widest"><tr><th className="p-6">Nome</th><th className="p-6">ID Matrícula</th><th className="p-6 text-center">Ação</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">{checkers.map(c => <tr key={c.id} className="hover:bg-slate-50 transition-colors"><td className="p-6 font-black text-slate-800 uppercase tracking-tighter text-sm">{c.name}</td><td className="p-6 text-slate-500 font-mono text-sm tracking-widest">{c.externalId}</td><td className="p-6 text-center"><button onClick={() => setCheckers(checkers.filter(x => x.id !== c.id))} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={20}/></button></td></tr>)}</tbody>
+                  <tbody className="divide-y divide-slate-100">{checkers.map(c => (
+                    <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-6 font-black text-slate-800 uppercase tracking-tighter text-sm">{c.name}</td>
+                      <td className="p-6 text-slate-500 font-mono text-sm tracking-widest">{c.externalId}</td>
+                      <td className="p-6 text-center">
+                        <button onClick={async () => {
+                          if (confirm('Deseja excluir este conferente?')) {
+                            try {
+                              await deleteChecker(c.id);
+                            } catch (e) {
+                              alert('Erro ao excluir conferente');
+                            }
+                          }
+                        }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>
+                      </td>
+                    </tr>
+                  ))}</tbody>
                </table>
             </div>
           </div>
