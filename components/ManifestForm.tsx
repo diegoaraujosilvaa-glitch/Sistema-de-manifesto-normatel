@@ -97,6 +97,7 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
     return {
       id: Math.random().toString(36).substr(2, 9),
       ...formData,
+      status: 'PENDENTE',
       createdAt: new Date().toISOString(),
       createdBy: currentUser.name,
       cdName: cd?.name || '',

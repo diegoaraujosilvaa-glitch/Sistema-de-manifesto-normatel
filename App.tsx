@@ -17,7 +17,8 @@ import {
 import { 
   INITIAL_CHECKERS, 
   INITIAL_BRANCHES, 
-  INITIAL_CDS 
+  INITIAL_CDS,
+  INITIAL_VEHICLES
 } from './services/mockData';
 import { 
   Search, 
@@ -93,17 +94,17 @@ const App: React.FC = () => {
   });
 
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
-    const saved = localStorage.getItem('logi_vehicles');
-    return saved ? JSON.parse(saved) : [];
+    const saved = localStorage.getItem('logi_vehicles_v3');
+    return saved ? JSON.parse(saved) : INITIAL_VEHICLES;
   });
 
   const [branches, setBranches] = useState<Branch[]>(() => {
-    const saved = localStorage.getItem('logi_branches');
+    const saved = localStorage.getItem('logi_branches_v2');
     return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
   });
 
   const [cds, setCds] = useState<DistributionCenter[]>(() => {
-    const saved = localStorage.getItem('logi_cds');
+    const saved = localStorage.getItem('logi_cds_v2');
     return saved ? JSON.parse(saved) : INITIAL_CDS;
   });
 
@@ -111,6 +112,10 @@ const App: React.FC = () => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState({
+    start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
   
   // UI Control States
   const [showForm, setShowForm] = useState(false);
@@ -127,9 +132,9 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('logi_loading_manifests', JSON.stringify(loadingManifests)); }, [loadingManifests]);
   useEffect(() => { localStorage.setItem('logi_checkers', JSON.stringify(checkers)); }, [checkers]);
   useEffect(() => { localStorage.setItem('logi_drivers', JSON.stringify(drivers)); }, [drivers]);
-  useEffect(() => { localStorage.setItem('logi_vehicles', JSON.stringify(vehicles)); }, [vehicles]);
-  useEffect(() => { localStorage.setItem('logi_branches', JSON.stringify(branches)); }, [branches]);
-  useEffect(() => { localStorage.setItem('logi_cds', JSON.stringify(cds)); }, [cds]);
+  useEffect(() => { localStorage.setItem('logi_vehicles_v3', JSON.stringify(vehicles)); }, [vehicles]);
+  useEffect(() => { localStorage.setItem('logi_branches_v2', JSON.stringify(branches)); }, [branches]);
+  useEffect(() => { localStorage.setItem('logi_cds_v2', JSON.stringify(cds)); }, [cds]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,7 +214,7 @@ const App: React.FC = () => {
           <form onSubmit={handleLogin} className="p-8 space-y-5">
              {loginError && (
                <div className="p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 flex items-center gap-2">
-                 <Lock size(14) /> {loginError}
+                 <Lock size={14} /> {loginError}
                </div>
              )}
              <div className="space-y-1">
@@ -230,11 +235,123 @@ const App: React.FC = () => {
     );
   }
 
+  const addLoadingManifest = (m: LoadingManifest) => {
+    setLoadingManifests([m, ...loadingManifests]);
+    // Update linked pallet manifests status and delivery date
+    setManifests(prev => prev.map(manifest => {
+      if (m.linkedManifestIds.includes(manifest.id)) {
+        return {
+          ...manifest,
+          status: 'ENTREGUE',
+          deliveryDate: m.deliveryDate
+        };
+      }
+      return manifest;
+    }));
+  };
+
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard manifests={manifests} />;
+      case 'dashboard': return <Dashboard manifests={manifests} dateRange={dateRange} setDateRange={setDateRange} />;
       case 'generate': return <ManifestForm checkers={checkers} branches={branches} cds={cds} onSave={m => setManifests([m, ...manifests])} currentUser={user} />;
-      case 'loading-manifest': return <LoadingManifestForm drivers={drivers} vehicles={vehicles} branches={branches} cds={cds} onSave={m => setLoadingManifests([m, ...loadingManifests])} currentUser={user} />;
+      case 'loading-manifest': 
+        return (
+          <LoadingManifestForm 
+            drivers={drivers} 
+            vehicles={vehicles} 
+            branches={branches} 
+            cds={cds} 
+            pendingManifests={manifests.filter(m => m.status === 'PENDENTE')}
+            onSave={addLoadingManifest} 
+            currentUser={user} 
+          />
+        );
+      
+      case 'pallet-manifests':
+        return (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="shrink-0">
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Manifestos e Paletes Conferidos</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Controle de conferência e status de entrega</p>
+              </div>
+              
+              <div className="flex flex-col md:flex-row items-center gap-4 flex-1 justify-end">
+                <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                  <div className="flex flex-col px-2">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Início</span>
+                    <input type="date" className="bg-transparent border-0 p-0 text-[10px] font-bold outline-none" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
+                  </div>
+                  <div className="w-px h-8 bg-slate-200 mx-1"></div>
+                  <div className="flex flex-col px-2">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Fim</span>
+                    <input type="date" className="bg-transparent border-0 p-0 text-[10px] font-bold outline-none" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="relative w-full md:w-64">
+                  <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                  <input className="w-full pl-12 pr-4 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-sm" placeholder="Pesquisar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[1200px]">
+                <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
+                  <tr>
+                    <th className="p-6">Manifesto</th>
+                    <th className="p-6">Tipo</th>
+                    <th className="p-6">Destino</th>
+                    <th className="p-6">Conferente</th>
+                    <th className="p-6">Pedidos</th>
+                    <th className="p-6">Origem</th>
+                    <th className="p-6 text-center">Paletes</th>
+                    <th className="p-6">Status</th>
+                    <th className="p-6">Entrega</th>
+                    <th className="p-6 text-center">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 italic">
+                  {manifests.filter(m => {
+                    const date = m.createdAt.split('T')[0];
+                    const matchesDate = date >= dateRange.start && date <= dateRange.end;
+                    const matchesSearch = m.manifestNumber.includes(searchTerm) || 
+                                        m.branchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        m.checkerName.toLowerCase().includes(searchTerm.toLowerCase());
+                    return matchesDate && matchesSearch;
+                  }).map(m => (
+                    <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-6 font-black text-orange-600">{m.manifestNumber}</td>
+                      <td className="p-6 font-bold text-slate-500 text-[10px]">{m.conferenceType}</td>
+                      <td className="p-6 font-black text-slate-800">{m.branchName}</td>
+                      <td className="p-6 font-bold text-slate-600">{m.checkerName}</td>
+                      <td className="p-6">
+                        <div className="max-w-[200px] truncate text-[10px] font-mono text-slate-400" title={m.orders}>{m.orders}</div>
+                      </td>
+                      <td className="p-6 font-bold text-slate-500 text-[10px]">{m.cdName}</td>
+                      <td className="p-6 text-center font-black text-lg">{m.palletsCount}</td>
+                      <td className="p-6">
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase ${m.status === 'ENTREGUE' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                          {m.status || 'PENDENTE'}
+                        </span>
+                      </td>
+                      <td className="p-6 font-bold text-slate-400 text-[10px]">
+                        {m.deliveryDate ? new Date(m.deliveryDate).toLocaleDateString('pt-BR') : '-'}
+                      </td>
+                      <td className="p-6 text-center">
+                        <div className="flex justify-center gap-2">
+                          <button onClick={() => generateManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors" title="Imprimir Etiquetas"><Printer size={18}/></button>
+                          <button onClick={() => setManifests(manifests.filter(x => x.id !== m.id))} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
       
       case 'users':
         return (
@@ -422,9 +539,14 @@ const App: React.FC = () => {
                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Gestão de Veículos</h3>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Controle de frota e capacidade</p>
               </div>
-              <button onClick={() => setShowForm(!showForm)} className={`p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${showForm ? 'bg-slate-100 text-slate-500' : 'bg-orange-600 text-white shadow-lg shadow-orange-100'}`}>
-                {showForm ? <X size={18} /> : <Truck size={18}/>} {showForm ? 'Cancelar' : 'Novo Veículo'}
-              </button>
+              <div className="flex gap-3">
+                <button onClick={() => setVehicles(INITIAL_VEHICLES)} className="p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">
+                  Restaurar Padrão
+                </button>
+                <button onClick={() => setShowForm(!showForm)} className={`p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${showForm ? 'bg-slate-100 text-slate-500' : 'bg-orange-600 text-white shadow-lg shadow-orange-100'}`}>
+                  {showForm ? <X size={18} /> : <Truck size={18}/>} {showForm ? 'Cancelar' : 'Novo Veículo'}
+                </button>
+              </div>
             </div>
 
             {showForm && (
@@ -534,54 +656,74 @@ const App: React.FC = () => {
       case 'history':
         return (
           <div className="space-y-6">
-             <div className="relative">
-                <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                <input className="w-full pl-12 pr-4 py-4 bg-white border-0 rounded-2xl shadow-sm focus:ring-2 focus:ring-orange-500 outline-none font-medium" placeholder="Pesquisar por número do manifesto, carga ou destino..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-             </div>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="p-6 bg-slate-50 border-b font-black text-[10px] uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                    <PlusCircle size={14} className="text-orange-600" /> Etiquetas de Conferência
+             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="shrink-0">
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Histórico de Embarques</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Manifestos de carga finalizados</p>
+              </div>
+
+              <div className="flex flex-col md:flex-row items-center gap-4 flex-1 justify-end">
+                <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                  <div className="flex flex-col px-2">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Início</span>
+                    <input type="date" className="bg-transparent border-0 p-0 text-[10px] font-bold outline-none" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
                   </div>
-                  <div className="max-h-[500px] overflow-y-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead><tr className="bg-slate-50/50 border-b text-[10px] uppercase font-black tracking-widest text-slate-400"><th className="p-4">Nº Manifesto</th><th className="p-4">Destino</th><th className="p-4 text-center">Ação</th></tr></thead>
-                      <tbody className="divide-y divide-slate-100">{manifests.filter(m => m.manifestNumber.includes(searchTerm) || m.branchName.toLowerCase().includes(searchTerm.toLowerCase())).map(m => (
-                        <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-4 font-black text-orange-600 uppercase tracking-tighter">{m.manifestNumber}</td><td className="p-4 font-bold text-slate-700 uppercase tracking-tighter">{m.branchName}</td>
-                          <td className="p-4 text-center">
-                             <div className="flex justify-center gap-2">
-                               <button onClick={() => generateManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors"><Printer size={18}/></button>
-                               <button onClick={() => setManifests(manifests.filter(x => x.id !== m.id))} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
-                             </div>
-                          </td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
+                  <div className="w-px h-8 bg-slate-200 mx-1"></div>
+                  <div className="flex flex-col px-2">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Fim</span>
+                    <input type="date" className="bg-transparent border-0 p-0 text-[10px] font-bold outline-none" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
                   </div>
                 </div>
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="p-6 bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest flex items-center gap-2">
-                    <Truck size={14} className="text-orange-600" /> Manifestos de Embarque
-                  </div>
-                  <div className="max-h-[500px] overflow-y-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead><tr className="bg-slate-50/50 border-b text-[10px] uppercase font-black tracking-widest text-slate-400"><th className="p-4">Nº Carga</th><th className="p-4">Placa</th><th className="p-4 text-center">Ação</th></tr></thead>
-                      <tbody className="divide-y divide-slate-100">{loadingManifests.filter(m => m.manifestNumber.includes(searchTerm) || m.vehiclePlate.includes(searchTerm)).map(m => (
-                        <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-4 font-black text-slate-800 uppercase tracking-tighter">{m.manifestNumber}</td><td className="p-4"><div className="bg-slate-100 px-2 py-1 rounded text-[11px] font-black font-mono inline-block">{m.vehiclePlate}</div></td>
-                          <td className="p-4 text-center">
-                             <div className="flex justify-center gap-2">
-                               <button onClick={() => generateLoadingManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors"><Printer size={18}/></button>
-                               <button onClick={() => setLoadingManifests(loadingManifests.filter(x => x.id !== m.id))} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
-                             </div>
-                          </td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
+
+                <div className="relative w-full md:w-64">
+                  <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                  <input className="w-full pl-12 pr-4 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-sm" placeholder="Pesquisar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-             </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[1000px]">
+                <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
+                  <tr>
+                    <th className="p-6">Nº Carga</th>
+                    <th className="p-6">Data Saída</th>
+                    <th className="p-6">Placa</th>
+                    <th className="p-6">Motorista</th>
+                    <th className="p-6">Destino</th>
+                    <th className="p-6 text-center">NFs</th>
+                    <th className="p-6 text-center">Manifestos</th>
+                    <th className="p-6 text-center">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 italic">
+                  {loadingManifests.filter(m => {
+                    const date = m.createdAt.split('T')[0];
+                    const matchesDate = date >= dateRange.start && date <= dateRange.end;
+                    const matchesSearch = m.manifestNumber.includes(searchTerm) || 
+                                        m.vehiclePlate.includes(searchTerm) ||
+                                        m.driverName.toLowerCase().includes(searchTerm.toLowerCase());
+                    return matchesDate && matchesSearch;
+                  }).map(m => (
+                    <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-6 font-black text-slate-800 uppercase tracking-tighter">{m.manifestNumber}</td>
+                      <td className="p-6 text-slate-500 font-bold text-[10px]">{new Date(m.createdAt).toLocaleDateString('pt-BR')}</td>
+                      <td className="p-6"><div className="bg-slate-100 px-3 py-1.5 rounded-lg text-[11px] font-black font-mono inline-block border border-slate-200">{m.vehiclePlate}</div></td>
+                      <td className="p-6 font-bold text-slate-600">{m.driverName}</td>
+                      <td className="p-6 font-black text-slate-800">{m.branchName}</td>
+                      <td className="p-6 text-center font-black text-orange-600">{m.invoices.length}</td>
+                      <td className="p-6 text-center font-black text-slate-400">{m.linkedManifestIds?.length || 0}</td>
+                      <td className="p-6 text-center">
+                        <div className="flex justify-center gap-2">
+                          <button onClick={() => generateLoadingManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors" title="Imprimir Manifesto"><Printer size={18}/></button>
+                          <button onClick={() => setLoadingManifests(loadingManifests.filter(x => x.id !== m.id))} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       case 'checkers':

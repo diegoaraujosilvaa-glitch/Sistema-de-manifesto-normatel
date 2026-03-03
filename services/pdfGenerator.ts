@@ -168,6 +168,7 @@ export const generateLoadingManifestPDF = async (data: LoadingManifest, isPrevie
   doc.text(`MOTORISTA: ${data.driverName}`, 15, 100);
   doc.text(`VEÍCULO (PLACA): ${data.vehiclePlate}`, 15, 106);
   doc.text(`EMITIDO POR: ${data.createdBy}`, 15, 112);
+  doc.text(`MANIFESTOS VINCULADOS: ${data.linkedManifestIds?.length || 0}`, pageWidth - 70, 100);
 
   // Section 3: Notas Fiscais (Table)
   doc.setFontSize(12);
@@ -179,9 +180,10 @@ export const generateLoadingManifestPDF = async (data: LoadingManifest, isPrevie
   doc.setFillColor(241, 245, 249);
   doc.rect(15, 132, pageWidth - 30, 8, 'F');
   doc.setFontSize(9);
-  doc.text('ÍNDICE', 20, 137);
-  doc.text('NÚMERO NF', 40, 137);
-  doc.text('CHAVE DE ACESSO', 70, 137);
+  doc.text('ÍNDICE', 18, 137);
+  doc.text('NÚMERO NF', 35, 137);
+  doc.text('MANIFESTO', 65, 137);
+  doc.text('CHAVE DE ACESSO', 95, 137);
 
   let y = 145;
   data.invoices.forEach((inv, index) => {
@@ -190,12 +192,16 @@ export const generateLoadingManifestPDF = async (data: LoadingManifest, isPrevie
       y = 20;
     }
     doc.setFont('helvetica', 'normal');
-    doc.text(`${index + 1}`, 20, y);
+    doc.text(`${index + 1}`, 18, y);
     doc.setFont('helvetica', 'bold');
-    doc.text(inv.number, 40, y);
+    doc.text(inv.number, 35, y);
+    doc.setFontSize(8);
+    doc.setTextColor(234, 88, 12); // Orange for manifest
+    doc.text(inv.manifestNumber || '-', 65, y);
+    doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text(inv.key, 70, y);
+    doc.setFontSize(6);
+    doc.text(inv.key, 95, y);
     doc.setFontSize(9);
     doc.setDrawColor(200, 200, 200);
     doc.line(15, y + 2, pageWidth - 15, y + 2);

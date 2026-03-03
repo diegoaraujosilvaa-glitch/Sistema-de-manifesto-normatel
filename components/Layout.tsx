@@ -13,12 +13,15 @@ import {
   UserCheck,
   Car,
   UserCog,
-  Warehouse
+  Warehouse,
+  ClipboardList,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { UserProfile } from '../types';
 
 const LogoSmall = () => (
-  <svg viewBox="0 0 100 100" className="w-8 h-8">
+  <svg viewBox="0 0 100 100" className="w-8 h-8 shrink-0">
     <path d="M20 80 L50 40 L80 40 L50 80 Z" fill="#ea580c" />
     <path d="M20 20 L50 60 L80 60 L50 20 Z" fill="#ea580c" />
   </svg>
@@ -34,12 +37,14 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, user, activeTab, setActiveTab, onLogout }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'CONFERENTE', 'ADMINISTRATIVO'] },
     { id: 'generate', label: 'Conferência', icon: PlusCircle, roles: ['ADMIN', 'CONFERENTE', 'ADMINISTRATIVO'] },
+    { id: 'pallet-manifests', label: 'Manifestos/Paletes', icon: ClipboardList, roles: ['ADMIN', 'CONFERENTE', 'ADMINISTRATIVO'] },
     { id: 'loading-manifest', label: 'Carga/Embarque', icon: Truck, roles: ['ADMIN', 'CONFERENTE', 'ADMINISTRATIVO'] },
-    { id: 'history', label: 'Histórico', icon: History, roles: ['ADMIN', 'CONFERENTE', 'ADMINISTRATIVO'] },
+    { id: 'history', label: 'Histórico Embarque', icon: History, roles: ['ADMIN', 'CONFERENTE', 'ADMINISTRATIVO'] },
     { id: 'users', label: 'Usuários', icon: UserCog, roles: ['ADMIN'] },
     { id: 'cds', label: 'Centros de Distribuição', icon: Warehouse, roles: ['ADMIN', 'ADMINISTRATIVO'] },
     { id: 'checkers', label: 'Conferentes', icon: UserCheck, roles: ['ADMIN', 'ADMINISTRATIVO'] },
@@ -58,36 +63,65 @@ const Layout: React.FC<LayoutProps> = ({ children, user, activeTab, setActiveTab
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
       )}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col no-print transition-transform duration-300 transform lg:relative lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
-          <LogoSmall />
-          <div className="flex flex-col">
-            <span className="font-black text-lg text-white leading-none uppercase italic">Normatel</span>
-            <span className="text-[8px] text-orange-500 font-bold uppercase tracking-widest">Logística & CD</span>
+      <aside className={`fixed inset-y-0 left-0 z-50 bg-slate-900 text-slate-300 flex flex-col no-print transition-all duration-300 transform lg:relative lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'w-20' : 'w-64'}`}>
+        <div className="p-6 flex items-center justify-between border-b border-slate-800 overflow-hidden">
+          <div className="flex items-center gap-3 min-w-0">
+            <LogoSmall />
+            {!isCollapsed && (
+              <div className="flex flex-col animate-in fade-in duration-300">
+                <span className="font-black text-lg text-white leading-none uppercase italic truncate">Normatel</span>
+                <span className="text-[8px] text-orange-500 font-bold uppercase tracking-widest truncate">Logística & CD</span>
+              </div>
+            )}
           </div>
+          <button onClick={() => setIsCollapsed(!isCollapsed)} className="hidden lg:flex p-1.5 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-white transition-colors">
+            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
         </div>
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
           {menuItems.map((item) => {
             if (!item.roles.includes(user.role)) return null;
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
-              <button key={item.id} onClick={() => handleTabChange(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${isActive ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/20' : 'hover:bg-slate-800 hover:text-white'}`}>
-                <Icon size={18} className={isActive ? 'text-white' : 'text-slate-500'} />
-                <span className="font-bold text-xs uppercase tracking-wider">{item.label}</span>
+              <button 
+                key={item.id} 
+                onClick={() => handleTabChange(item.id)} 
+                title={isCollapsed ? item.label : ''}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all relative group ${isActive ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/20' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Icon size={18} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
+                {!isCollapsed && (
+                  <span className="font-bold text-xs uppercase tracking-wider truncate animate-in fade-in slide-in-from-left-2 duration-300">{item.label}</span>
+                )}
+                {isCollapsed && (
+                  <div className="absolute left-full ml-4 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                    {item.label}
+                  </div>
+                )}
               </button>
             );
           })}
         </nav>
         <div className="p-4 border-t border-slate-800 space-y-4">
-          <div className="px-4 py-3 bg-slate-800/50 rounded-2xl border border-slate-700/50">
-            <p className="text-[8px] text-orange-500 uppercase font-black tracking-widest mb-1">Operador</p>
-            <p className="text-xs font-bold text-white truncate">{user.name}</p>
-            <p className="text-[10px] text-slate-500 font-medium">{user.role}</p>
+          <div className={`px-4 py-3 bg-slate-800/50 rounded-2xl border border-slate-700/50 overflow-hidden transition-all ${isCollapsed ? 'px-2' : 'px-4'}`}>
+            {!isCollapsed ? (
+              <div className="animate-in fade-in duration-300">
+                <p className="text-[8px] text-orange-500 uppercase font-black tracking-widest mb-1">Operador</p>
+                <p className="text-xs font-bold text-white truncate">{user.name}</p>
+                <p className="text-[10px] text-slate-500 font-medium">{user.role}</p>
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-white font-black text-xs">
+                  {user.name.charAt(0)}
+                </div>
+              </div>
+            )}
           </div>
-          <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-2xl transition-colors">
-            <LogOut size={18} />
-            <span className="font-bold text-xs uppercase">Sair</span>
+          <button onClick={onLogout} className={`w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-2xl transition-colors ${isCollapsed ? 'justify-center' : ''}`}>
+            <LogOut size={18} className="shrink-0" />
+            {!isCollapsed && <span className="font-bold text-xs uppercase animate-in fade-in duration-300">Sair</span>}
           </button>
         </div>
       </aside>

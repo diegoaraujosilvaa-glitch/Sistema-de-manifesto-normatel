@@ -50,6 +50,7 @@ export interface DistributionCenter {
 export interface InvoiceItem {
   key: string;
   number: string;
+  manifestNumber?: string; // Opcional para legibilidade
 }
 
 export interface Manifest {
@@ -63,6 +64,8 @@ export interface Manifest {
   palletsCount: number;
   conferenceType: string;
   specialProducts: string[];
+  status: 'PENDENTE' | 'ENTREGUE';
+  deliveryDate?: string;
   createdAt: string;
   createdBy: string;
   cdName: string;
@@ -80,6 +83,7 @@ export interface LoadingManifest {
   sealNumber: string;
   deliveryDate: string;
   exitTime: string;
+  linkedManifestIds: string[];
   invoices: InvoiceItem[];
   createdAt: string;
   createdBy: string;

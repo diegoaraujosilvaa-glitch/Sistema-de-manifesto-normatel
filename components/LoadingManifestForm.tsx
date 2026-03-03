@@ -13,7 +13,10 @@ import {
   Download,
   Printer,
   Clock,
-  Calendar
+  Calendar,
+  Plus,
+  ClipboardList,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   Driver, 
@@ -21,7 +24,8 @@ import {
   Branch, 
   DistributionCenter, 
   LoadingManifest, 
-  InvoiceItem 
+  InvoiceItem,
+  Manifest
 } from '../types';
 import { generateLoadingManifestPDF } from '../services/pdfGenerator';
 
@@ -30,6 +34,7 @@ interface LoadingManifestFormProps {
   vehicles: Vehicle[];
   branches: Branch[];
   cds: DistributionCenter[];
+  pendingManifests: Manifest[];
   onSave: (m: LoadingManifest) => void;
   currentUser: { name: string; uid: string };
 }
@@ -39,6 +44,7 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
   vehicles, 
   branches, 
   cds, 
+  pendingManifests,
   onSave,
   currentUser
 }) => {
@@ -53,7 +59,10 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
     exitTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
   });
 
+  const [selectedManifestIds, setSelectedManifestIds] = useState<string[]>([]);
+  const [currentManifestId, setCurrentManifestId] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
+  const [tempInvoices, setTempInvoices] = useState<InvoiceItem[]>([]);
   const [scannerInput, setScannerInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -77,21 +86,52 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
       setScannerInput('');
       return;
     }
-    if (invoices.some(i => i.key === val)) {
+    if (invoices.some(i => i.key === val) || tempInvoices.some(i => i.key === val)) {
       setError("NF já bipada.");
       setScannerInput('');
       return;
     }
     const nfNumber = val.substring(25, 34);
-    setInvoices([{ key: val, number: nfNumber }, ...invoices]);
+    setTempInvoices([{ key: val, number: nfNumber }, ...tempInvoices]);
     setScannerInput('');
     scannerRef.current?.focus();
   };
 
   const removeInvoice = (key: string) => setInvoices(invoices.filter(i => i.key !== key));
+  const removeTempInvoice = (key: string) => setTempInvoices(tempInvoices.filter(i => i.key !== key));
+
+  const handleLinkNFs = () => {
+    if (!currentManifestId) {
+      setError("Selecione um manifesto primeiro.");
+      return;
+    }
+    if (tempInvoices.length === 0) {
+      setError("Bipe pelo menos uma NF para vincular.");
+      return;
+    }
+
+    const manifest = pendingManifests.find(m => m.id === currentManifestId);
+    if (!manifest) return;
+
+    const linkedInvoices = tempInvoices.map(inv => ({
+      ...inv,
+      manifestNumber: manifest.manifestNumber
+    }));
+
+    setInvoices([...linkedInvoices, ...invoices]);
+    setSelectedManifestIds(prev => prev.includes(currentManifestId) ? prev : [...prev, currentManifestId]);
+    setTempInvoices([]);
+    setCurrentManifestId(null);
+    setError(null);
+  };
+
+  const toggleManifest = (id: string) => {
+    setCurrentManifestId(id === currentManifestId ? null : id);
+  };
 
   const validate = () => {
     if (!formData.branchId || !formData.driverId || !formData.vehicleId || !formData.exitTime || !formData.deliveryDate) return "Preencha todos os campos obrigatórios";
+    if (selectedManifestIds.length === 0) return "Selecione pelo menos um manifesto de palete";
     if (invoices.length === 0) return "Bipe pelo menos uma NF";
     return null;
   };
@@ -104,6 +144,7 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
     return {
       id: `lm_${Date.now()}`,
       ...formData,
+      linkedManifestIds: selectedManifestIds,
       invoices,
       createdAt: new Date().toISOString(),
       createdBy: currentUser.name,
@@ -137,10 +178,17 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
       await generateLoadingManifestPDF(m, false);
       onSave(m);
       setInvoices([]);
+      setSelectedManifestIds([]);
       setFormData({ ...formData, manifestNumber: `MC-${Date.now().toString().substr(-6)}`, sealNumber: '', exitTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) });
     } catch (e) { setError("Erro ao salvar."); }
     finally { setIsGenerating(false); }
   };
+
+  const selectedManifestsData = pendingManifests.filter(m => selectedManifestIds.includes(m.id));
+
+  const filteredPendingManifests = formData.branchId 
+    ? pendingManifests.filter(m => m.branchId === formData.branchId)
+    : [];
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -153,8 +201,8 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
           <span className="text-[10px] font-black tracking-widest bg-orange-600 px-3 py-1 rounded-full uppercase">Expedição CD</span>
         </div>
         
-        <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="space-y-4 lg:col-span-1 border-r border-slate-100 pr-0 lg:pr-10">
+        <div className="p-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div className="space-y-4 lg:col-span-4 border-r border-slate-100 pr-0 lg:pr-10">
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Filial de Destino *</label>
               <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none" value={formData.branchId} onChange={e => setFormData({...formData, branchId: e.target.value})}>
@@ -209,39 +257,156 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
             {error && <div className="p-3 bg-red-50 text-red-600 text-[10px] font-bold rounded-xl border border-red-100 flex items-center gap-2 italic"><AlertCircle size={14} /> {error}</div>}
           </div>
 
-          <div className="lg:col-span-2 space-y-8">
-            <div className="bg-orange-50 p-8 rounded-3xl border border-orange-100 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-2 opacity-10"><Scan size={100} /></div>
-              <div className="flex items-center gap-3 mb-6">
-                <Scan className="text-orange-600" />
-                <h3 className="font-black text-orange-900 uppercase text-xs tracking-widest">Leitura de Notas Fiscais</h3>
+          <div className="lg:col-span-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Manifest Selection */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="text-orange-600" size={18} />
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Selecionar Manifestos (Pendentes)</h3>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 max-h-[300px] overflow-y-auto space-y-2">
+                  {!formData.branchId ? (
+                    <p className="text-[10px] text-slate-400 font-bold uppercase text-center py-10">Selecione uma filial para ver os manifestos</p>
+                  ) : filteredPendingManifests.length === 0 ? (
+                    <p className="text-[10px] text-slate-400 font-bold uppercase text-center py-10">Nenhum manifesto pendente para esta filial</p>
+                  ) : (
+                    filteredPendingManifests.map(m => {
+                      const isLinked = selectedManifestIds.includes(m.id);
+                      const isCurrent = currentManifestId === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => toggleManifest(m.id)}
+                          disabled={isLinked && !isCurrent}
+                          className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between ${
+                            isCurrent
+                            ? 'bg-orange-100 border-orange-600 text-orange-900'
+                            : isLinked
+                            ? 'bg-green-50 border-green-200 text-green-700 opacity-60'
+                            : 'bg-white border-slate-100 text-slate-600 hover:border-orange-200'
+                          }`}
+                        >
+                          <div className="text-left">
+                            <p className="text-[10px] font-black uppercase tracking-tighter">Manifesto: {m.manifestNumber}</p>
+                            <p className="text-[9px] opacity-80 font-bold uppercase">{m.branchName} • {m.palletsCount} Paletes</p>
+                          </div>
+                          {isLinked ? <CheckCircle2 size={16} className="text-green-600" /> : isCurrent ? <Clock size={16} className="text-orange-600 animate-pulse" /> : null}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+                {currentManifestId && (
+                  <div className="p-3 bg-orange-50 rounded-xl border border-orange-100 flex items-center justify-between">
+                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Trabalhando no Manifesto: {pendingManifests.find(m => m.id === currentManifestId)?.manifestNumber}</p>
+                    <button onClick={() => setCurrentManifestId(null)} className="text-slate-400 hover:text-red-500"><X size={14}/></button>
+                  </div>
+                )}
+                {selectedManifestIds.length > 0 && (
+                  <div className="p-3 bg-orange-50 rounded-xl border border-orange-100">
+                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Selecionados: {selectedManifestIds.length}</p>
+                  </div>
+                )}
               </div>
-              <form onSubmit={handleScan} className="relative">
-                <input ref={scannerRef} type="text" placeholder="Bipe a Chave de Acesso (44 dígitos)..." className="w-full p-5 pr-20 bg-white border-2 border-orange-200 rounded-2xl focus:ring-4 focus:ring-orange-100 outline-none text-xl font-mono font-bold tracking-tighter" value={scannerInput} onChange={e => setScannerInput(e.target.value)} autoFocus />
-                <button type="submit" className="absolute right-2 top-2 bottom-2 px-6 bg-orange-600 text-white rounded-xl font-black uppercase text-xs">OK</button>
-              </form>
+
+              {/* NF Scanning */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Scan className="text-orange-600" size={18} />
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Leitura de Notas Fiscais</h3>
+                </div>
+                <form onSubmit={handleScan} className="relative">
+                  <input ref={scannerRef} type="text" placeholder={currentManifestId ? "Bipe as NFs para este manifesto..." : "Selecione um manifesto primeiro"} disabled={!currentManifestId} className="w-full p-4 pr-16 bg-white border-2 border-slate-200 rounded-2xl focus:ring-4 focus:ring-orange-100 outline-none text-lg font-mono font-bold tracking-tighter disabled:bg-slate-50 disabled:cursor-not-allowed" value={scannerInput} onChange={e => setScannerInput(e.target.value)} />
+                  <button type="submit" disabled={!currentManifestId} className="absolute right-2 top-2 bottom-2 px-4 bg-orange-600 text-white rounded-xl font-black uppercase text-[10px] disabled:bg-slate-300">OK</button>
+                </form>
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div className="p-3 bg-slate-50 border-b flex justify-between items-center">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">NFs para Vincular ({tempInvoices.length})</span>
+                    {tempInvoices.length > 0 && <button onClick={() => setTempInvoices([])} className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:underline">Limpar</button>}
+                  </div>
+                  <div className="max-h-[150px] overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <tbody className="divide-y">
+                        {tempInvoices.map((inv) => (
+                          <tr key={inv.key} className="hover:bg-slate-50">
+                            <td className="px-4 py-2 font-black text-orange-600">{inv.number}</td>
+                            <td className="px-4 py-2 text-right"><button onClick={() => removeTempInvoice(inv.key)} className="p-1 text-slate-300 hover:text-red-500"><Trash2 size={14} /></button></td>
+                          </tr>
+                        ))}
+                        {tempInvoices.length === 0 && (
+                          <tr><td colSpan={2} className="p-4 text-center text-[10px] text-slate-400 font-bold uppercase">Nenhuma NF bipada</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {tempInvoices.length > 0 && (
+                    <div className="p-3 bg-slate-50 border-t">
+                      <button onClick={handleLinkNFs} className="w-full py-2 bg-orange-600 text-white rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2">
+                        <Plus size={14} /> Vincular Notas ao Manifesto
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Linked Invoices History */}
+                {invoices.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="p-3 bg-slate-900 text-white flex justify-between items-center">
+                      <span className="text-[9px] font-black uppercase tracking-widest">Notas Vinculadas ({invoices.length})</span>
+                    </div>
+                    <div className="max-h-[150px] overflow-y-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-[8px] font-black uppercase text-slate-400">
+                          <tr>
+                            <th className="px-4 py-2">NF</th>
+                            <th className="px-4 py-2">Manifesto</th>
+                            <th className="px-4 py-2 text-right">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {invoices.map((inv) => (
+                            <tr key={inv.key} className="hover:bg-slate-50">
+                              <td className="px-4 py-2 font-black text-slate-700">{inv.number}</td>
+                              <td className="px-4 py-2 font-bold text-orange-600">{inv.manifestNumber}</td>
+                              <td className="px-4 py-2 text-right"><button onClick={() => removeInvoice(inv.key)} className="p-1 text-slate-300 hover:text-red-500"><Trash2 size={14} /></button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-              <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Itens na Carga ({invoices.length})</span>
-                {invoices.length > 0 && <button onClick={() => setInvoices([])} className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline">Zerar Lista</button>}
+            {/* Summary of Selected Manifests */}
+            {selectedManifestsData.length > 0 && (
+              <div className="bg-slate-900 rounded-3xl p-6 text-white space-y-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="text-orange-500" size={18} />
+                  <h3 className="text-xs font-black uppercase tracking-widest">Resumo da Carga</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Total Manifestos</p>
+                    <p className="text-xl font-black">{selectedManifestsData.length}</p>
+                  </div>
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Total Paletes</p>
+                    <p className="text-xl font-black">{selectedManifestsData.reduce((acc, curr) => acc + curr.palletsCount, 0)}</p>
+                  </div>
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Total NFs</p>
+                    <p className="text-xl font-black">{invoices.length}</p>
+                  </div>
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Filial Destino</p>
+                    <p className="text-xs font-black truncate">{branches.find(b => b.id === formData.branchId)?.name || '-'}</p>
+                  </div>
+                </div>
               </div>
-              <div className="max-h-[400px] overflow-y-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <tr><th className="px-6 py-3">NF</th><th className="px-6 py-3">Chave</th><th className="px-6 py-3 text-right">Excluir</th></tr>
-                  </thead>
-                  <tbody className="divide-y">{invoices.map((inv) => (
-                      <tr key={inv.key} className="hover:bg-slate-50">
-                        <td className="px-6 py-4 font-black text-orange-600">{inv.number}</td>
-                        <td className="px-6 py-4 text-slate-400 font-mono text-xs truncate max-w-[200px]">{inv.key}</td>
-                        <td className="px-6 py-4 text-right"><button onClick={() => removeInvoice(inv.key)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 size={18} /></button></td>
-                      </tr>
-                    ))}</tbody>
-                </table>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
