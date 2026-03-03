@@ -44,6 +44,12 @@ import {
   UserCheck
 } from 'lucide-react';
 import { generateManifestPDF, generateLoadingManifestPDF } from './services/pdfGenerator';
+import { 
+  subscribeToManifests, 
+  subscribeToLoadingManifests, 
+  saveManifest, 
+  saveLoadingManifest 
+} from './services/firestoreService';
 
 const LogoNormatel = ({ size = 40, className = "" }) => (
   <div className={`relative inline-block ${className}`} style={{ width: size, height: size }}>
@@ -73,15 +79,17 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [defaultAdmin];
   });
 
-  const [manifests, setManifests] = useState<Manifest[]>(() => {
-    const saved = localStorage.getItem('logi_manifests');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [manifests, setManifests] = useState<Manifest[]>([]);
+  const [loadingManifests, setLoadingManifests] = useState<LoadingManifest[]>([]);
 
-  const [loadingManifests, setLoadingManifests] = useState<LoadingManifest[]>(() => {
-    const saved = localStorage.getItem('logi_loading_manifests');
-    return saved ? JSON.parse(saved) : [];
-  });
+  useEffect(() => {
+    const unsubManifests = subscribeToManifests(setManifests);
+    const unsubLoading = subscribeToLoadingManifests(setLoadingManifests);
+    return () => {
+      unsubManifests();
+      unsubLoading();
+    };
+  }, []);
 
   const [checkers, setCheckers] = useState<Checker[]>(() => {
     const saved = localStorage.getItem('logi_checkers');
@@ -128,8 +136,6 @@ const App: React.FC = () => {
   const [newCD, setNewCD] = useState({ name: '', code: '' });
 
   useEffect(() => { localStorage.setItem('logi_all_users', JSON.stringify(allUsers)); }, [allUsers]);
-  useEffect(() => { localStorage.setItem('logi_manifests', JSON.stringify(manifests)); }, [manifests]);
-  useEffect(() => { localStorage.setItem('logi_loading_manifests', JSON.stringify(loadingManifests)); }, [loadingManifests]);
   useEffect(() => { localStorage.setItem('logi_checkers', JSON.stringify(checkers)); }, [checkers]);
   useEffect(() => { localStorage.setItem('logi_drivers', JSON.stringify(drivers)); }, [drivers]);
   useEffect(() => { localStorage.setItem('logi_vehicles_v3', JSON.stringify(vehicles)); }, [vehicles]);
@@ -253,7 +259,13 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard manifests={manifests} dateRange={dateRange} setDateRange={setDateRange} />;
-      case 'generate': return <ManifestForm checkers={checkers} branches={branches} cds={cds} onSave={m => setManifests([m, ...manifests])} currentUser={user} />;
+      case 'generate': return <ManifestForm checkers={checkers} branches={branches} cds={cds} onSave={async m => {
+        try {
+          await saveManifest(m);
+        } catch (e) {
+          alert('Erro ao salvar manifesto no Firebase');
+        }
+      }} currentUser={user} />;
       case 'loading-manifest': 
         return (
           <LoadingManifestForm 
@@ -262,7 +274,13 @@ const App: React.FC = () => {
             branches={branches} 
             cds={cds} 
             pendingManifests={manifests.filter(m => m.status === 'PENDENTE')}
-            onSave={addLoadingManifest} 
+            onSave={async m => {
+              try {
+                await saveLoadingManifest(m);
+              } catch (e) {
+                alert('Erro ao salvar embarque no Firebase');
+              }
+            }} 
             currentUser={user} 
           />
         );

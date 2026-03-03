@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { FileText, Layers, TrendingUp, Calendar } from 'lucide-react';
 import { Manifest } from '../types';
+import { subscribeToManifests } from '../services/firestoreService';
 
 interface DashboardProps {
   manifests: Manifest[];
@@ -19,7 +20,19 @@ interface DashboardProps {
   setDateRange: (range: { start: string; end: string }) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ manifests, dateRange, setDateRange }) => {
+const Dashboard: React.FC<DashboardProps> = ({ manifests: initialManifests, dateRange, setDateRange }) => {
+  const [manifests, setManifests] = useState<Manifest[]>(initialManifests);
+
+  useEffect(() => {
+    // Real-time listener from Firestore
+    const unsubscribe = subscribeToManifests((data) => {
+      setManifests(data);
+    });
+
+    // Cleanup on unmount
+    return () => unsubscribe();
+  }, []);
+
   const today = new Date().toISOString().split('T')[0];
   
   const filteredManifests = manifests.filter(m => {
