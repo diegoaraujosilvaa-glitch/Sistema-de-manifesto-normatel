@@ -124,6 +124,8 @@ const App: React.FC = () => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('TODOS');
+  const [branchFilter, setBranchFilter] = useState('TODOS');
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -402,6 +404,27 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                  <div className="flex flex-col px-2">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Status</span>
+                    <select className="bg-transparent border-0 p-0 text-[10px] font-bold outline-none" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                      <option value="TODOS">TODOS</option>
+                      <option value="PENDENTE">PENDENTE</option>
+                      <option value="ENTREGUE">ENTREGUE</option>
+                    </select>
+                  </div>
+                  <div className="w-px h-8 bg-slate-200 mx-1"></div>
+                  <div className="flex flex-col px-2">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Destino</span>
+                    <select className="bg-transparent border-0 p-0 text-[10px] font-bold outline-none max-w-[120px]" value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
+                      <option value="TODOS">TODOS</option>
+                      {branches.map(b => (
+                        <option key={b.id} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="relative w-full md:w-64">
                   <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
                   <input className="w-full pl-12 pr-4 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-sm" placeholder="Pesquisar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
@@ -432,7 +455,9 @@ const App: React.FC = () => {
                     const matchesSearch = m.manifestNumber.includes(searchTerm) || 
                                         (m.branchName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         (m.checkerName || '').toLowerCase().includes(searchTerm.toLowerCase());
-                    return matchesDate && matchesSearch;
+                    const matchesStatus = statusFilter === 'TODOS' || (m.status || 'PENDENTE') === statusFilter;
+                    const matchesBranch = branchFilter === 'TODOS' || m.branchName === branchFilter;
+                    return matchesDate && matchesSearch && matchesStatus && matchesBranch;
                   }).map(m => (
                     <tr key={m.id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-6 font-black text-orange-600">{m.manifestNumber}</td>
