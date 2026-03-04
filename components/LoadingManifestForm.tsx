@@ -223,7 +223,7 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Veículo *</label>
                 <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none" value={formData.vehicleId} onChange={e => setFormData({...formData, vehicleId: e.target.value})}>
                   <option value="">Selecione...</option>
-                  {activeVehicles.map(v => <option key={v.id} value={v.id}>{v.plate}</option>)}
+                  {activeVehicles.map(v => <option key={v.id} value={v.id}>{v.model} ({v.plate})</option>)}
                 </select>
               </div>
             </div>
