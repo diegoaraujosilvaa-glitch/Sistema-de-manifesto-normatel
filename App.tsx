@@ -197,7 +197,21 @@ const App: React.FC = () => {
     setLoginError(null);
     const emailInput = loginForm.email.toLowerCase();
     const passwordInput = loginForm.password;
-    const foundUser = allUsers.find(u => (u.email.toLowerCase() === emailInput || u.uid === emailInput) && u.password === passwordInput);
+    
+    // 1. Tenta encontrar nos usuários vindos do Firestore
+    let foundUser = allUsers.find(u => ((u.email || '').toLowerCase() === emailInput || u.uid === emailInput) && u.password === passwordInput);
+    
+    // 2. Fallback para admin padrão caso o banco esteja vazio ou usuário não encontrado (para o primeiro setup)
+    if (!foundUser && (emailInput === 'diego.silva' || emailInput === 'u_diego') && passwordInput === '05171888302') {
+      foundUser = { 
+        uid: 'u_diego', 
+        email: 'diego.silva', 
+        name: 'Diego Silva', 
+        role: 'ADMIN', 
+        password: '05171888302' 
+      };
+    }
+
     if (foundUser) {
       setUser(foundUser);
       localStorage.setItem('logi_user', JSON.stringify(foundUser));
@@ -413,8 +427,8 @@ const App: React.FC = () => {
                     const date = m.createdAt.split('T')[0];
                     const matchesDate = date >= dateRange.start && date <= dateRange.end;
                     const matchesSearch = m.manifestNumber.includes(searchTerm) || 
-                                        m.branchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        m.checkerName.toLowerCase().includes(searchTerm.toLowerCase());
+                                        (m.branchName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        (m.checkerName || '').toLowerCase().includes(searchTerm.toLowerCase());
                     return matchesDate && matchesSearch;
                   }).map(m => (
                     <tr key={m.id} className="hover:bg-slate-50 transition-colors">
@@ -855,7 +869,7 @@ const App: React.FC = () => {
                     const matchesDate = date >= dateRange.start && date <= dateRange.end;
                     const matchesSearch = m.manifestNumber.includes(searchTerm) || 
                                         m.vehiclePlate.includes(searchTerm) ||
-                                        m.driverName.toLowerCase().includes(searchTerm.toLowerCase());
+                                        (m.driverName || '').toLowerCase().includes(searchTerm.toLowerCase());
                     return matchesDate && matchesSearch;
                   }).map(m => (
                     <tr key={m.id} className="hover:bg-slate-50 transition-colors">
