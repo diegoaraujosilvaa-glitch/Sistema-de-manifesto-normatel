@@ -134,7 +134,7 @@ const App: React.FC = () => {
   const [isSeeding, setIsSeeding] = useState(false);
 
   const seedDatabase = async () => {
-    if (confirm('Deseja popular o banco de dados com os dados iniciais?')) {
+    if (confirm('Deseja popular o banco de dados com os dados iniciais (Conferentes e CDs)?')) {
       setIsSeeding(true);
       try {
         // Seed Checkers
@@ -144,25 +144,11 @@ const App: React.FC = () => {
             await saveChecker(data);
           }
         }
-        // Seed Branches
-        if (branches.length === 0) {
-          for (const b of INITIAL_BRANCHES) {
-            const { id, ...data } = b;
-            await saveBranch(data);
-          }
-        }
         // Seed CDs
         if (cds.length === 0) {
           for (const c of INITIAL_CDS) {
             const { id, ...data } = c;
             await saveCD(data);
-          }
-        }
-        // Seed Vehicles
-        if (vehicles.length === 0) {
-          for (const v of INITIAL_VEHICLES) {
-            const { id, ...data } = v;
-            await saveVehicle(data);
           }
         }
         // Seed Default Admin if no users
@@ -220,7 +206,11 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => { setUser(null); localStorage.removeItem('logi_user'); };
+  const handleLogout = () => { 
+    setUser(null); 
+    localStorage.removeItem('logi_user'); 
+    setLoginForm({ email: '', password: '' });
+  };
 
   const addUser = async () => {
     if (newUser.name && newUser.email && newUser.password) {
@@ -347,6 +337,19 @@ const App: React.FC = () => {
       return manifest;
     }));
   };
+
+  const sortedBranches = [...branches].sort((a, b) => {
+    const branchOrder = [
+      'FILIAL AS', 'FILIAL BM', 'FILIAL VT', 'FILIAL JN', 'FILIAL SD', 
+      'FILIAL PJ', 'FILIAL CB', 'FILIAL EB', 'FILIAL JQ', 'FILIAL GM', 
+      'FILIAL TZ', 'FILIAL PD', 'FILIAL RB', 'FILIAL AV'
+    ];
+    const indexA = branchOrder.indexOf(a.code);
+    const indexB = branchOrder.indexOf(b.code);
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+    return indexA - indexB;
+  });
 
   const renderContent = () => {
     switch (activeTab) {
@@ -682,16 +685,6 @@ const App: React.FC = () => {
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Controle de frota e capacidade</p>
               </div>
               <div className="flex gap-3">
-                {user.role === 'ADMIN' && (
-                  <button 
-                    onClick={seedDatabase} 
-                    disabled={isSeeding}
-                    className="p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all disabled:opacity-50"
-                  >
-                    {isSeeding ? <Loader2 className="animate-spin" size={18} /> : <Settings2 size={18} />} 
-                    {isSeeding ? 'Populando...' : 'Popular Banco'}
-                  </button>
-                )}
                 <button onClick={() => setShowForm(!showForm)} className={`p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${showForm ? 'bg-slate-100 text-slate-500' : 'bg-orange-600 text-white shadow-lg shadow-orange-100'}`}>
                   {showForm ? <X size={18} /> : <Truck size={18}/>} {showForm ? 'Cancelar' : 'Novo Veículo'}
                 </button>
@@ -762,9 +755,9 @@ const App: React.FC = () => {
                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Gestão de Filiais</h3>
                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Pontos de destino da mercadoria</p>
               </div>
-              <button onClick={() => setShowForm(!showForm)} className={`p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${showForm ? 'bg-slate-100 text-slate-500' : 'bg-orange-600 text-white shadow-lg shadow-orange-100'}`}>
-                {showForm ? <X size={18} /> : <Building2 size={18}/>} {showForm ? 'Cancelar' : 'Nova Filial'}
-              </button>
+                <button onClick={() => setShowForm(!showForm)} className={`p-4 rounded-2xl flex items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${showForm ? 'bg-slate-100 text-slate-500' : 'bg-orange-600 text-white shadow-lg shadow-orange-100'}`}>
+                  {showForm ? <X size={18} /> : <Building2 size={18}/>} {showForm ? 'Cancelar' : 'Nova Filial'}
+                </button>
             </div>
 
             {showForm && (
@@ -794,7 +787,7 @@ const App: React.FC = () => {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-               {branches.map(b => (
+               {sortedBranches.map(b => (
                  <div key={b.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg transition-all group relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-16 h-16 bg-orange-50 rounded-bl-full flex items-center justify-center -mr-4 -mt-4 opacity-40 group-hover:bg-orange-100 transition-colors">
                        <MapPin size={24} className="text-orange-600 translate-x-[-4px] translate-y-[4px]" />

@@ -7,19 +7,20 @@ export const INITIAL_CHECKERS: Checker[] = [
 ];
 
 export const INITIAL_BRANCHES: Branch[] = [
-  { id: 'b1', code: 'FILIAL AS', name: 'ANTONIO SALES', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
-  { id: 'b2', code: 'FILIAL BM', name: 'BEZERRA ED MENEZES', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
+  { id: 'b1', code: 'FILIAL AS', name: 'ANTÔNIO SALES', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
+  { id: 'b2', code: 'FILIAL BM', name: 'BEZERRA DE MENEZES', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b3', code: 'FILIAL VT', name: 'PREMIUM', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b4', code: 'FILIAL JN', name: 'JUAZEIRO DO NORTE', city: 'JUAZEIRO', state: 'CE', status: 'ATIVO' },
   { id: 'b5', code: 'FILIAL SD', name: 'SANTOS DUMONT', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b6', code: 'FILIAL PJ', name: 'PAJUÇARA', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b7', code: 'FILIAL CB', name: 'CAMBEBA', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b8', code: 'FILIAL EB', name: 'EUSÉBIO', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
-  { id: 'b9', code: 'FILIAL JQ', name: 'JOQUEI', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
+  { id: 'b9', code: 'FILIAL JQ', name: 'JÓQUEI', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b10', code: 'FILIAL GM', name: 'GODOFREDO MACIEL', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b11', code: 'FILIAL TZ', name: 'TERRAZO', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b12', code: 'FILIAL PD', name: 'PORTO DAS DUNAS', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
   { id: 'b13', code: 'FILIAL RB', name: 'RUI BARBOSA', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
+  { id: 'b14', code: 'FILIAL AV', name: 'ANEL VIÁRIO', city: 'FORTALEZA', state: 'CE', status: 'ATIVO' },
 ];
 
 export const INITIAL_CDS: DistributionCenter[] = [
@@ -34,8 +35,8 @@ export const INITIAL_VEHICLES: Vehicle[] = [
   { id: 'v5', plate: 'OSA6711', type: 'TRUCK', model: 'MB20', status: 'ATIVO' },
   { id: 'v6', plate: 'OSL9998', type: 'CARRETA', model: 'MB21', status: 'ATIVO' },
   { id: 'v7', plate: 'PMH9219', type: 'TRUCK', model: 'MB23', status: 'ATIVO' },
-  { id: 'v8', plate: 'OCF9681', type: 'TOCO', model: 'MB24', status: 'ATIVO' },
-  { id: 'v9', plate: 'OSU7145', type: 'TOCO', model: 'MB49', status: 'ATIVO' },
+  { id: 'v8', plate: 'OCF9681', type: '3/4', model: 'MB24', status: 'ATIVO' },
+  { id: 'v9', plate: 'OSU7145', type: '3/4', model: 'MB49', status: 'ATIVO' },
   { id: 'v10', plate: 'POW9495', type: 'TOCO', model: 'MB51', status: 'ATIVO' },
   { id: 'v11', plate: 'PNR2C84', type: 'TOCO', model: 'MB55', status: 'ATIVO' },
   { id: 'v12', plate: 'POR0C93', type: 'TOCO', model: 'MB56', status: 'ATIVO' },
