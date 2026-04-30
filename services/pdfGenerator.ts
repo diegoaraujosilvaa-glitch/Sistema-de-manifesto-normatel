@@ -84,7 +84,7 @@ export const generateManifestPDF = async (manifest: Manifest, isPreview: boolean
     doc.setFont('helvetica', 'bold');
     if (manifest.specialProducts && manifest.specialProducts.length > 0) {
       doc.setTextColor(234, 88, 12);
-      const specialText = manifest.specialProducts.join(' • ');
+      const specialText = manifest.specialProducts.map(p => `${p.name} (${p.quantity} vol)`).join(' • ');
       const splitSpecial = doc.splitTextToSize(specialText, pageWidth - 110);
       doc.text(splitSpecial, 20, 190);
     } else {

@@ -63,7 +63,7 @@ export interface Manifest {
   checkerId: string;
   palletsCount: number;
   conferenceType: string;
-  specialProducts: string[];
+  specialProducts: { name: string; quantity: number }[];
   status: 'PENDENTE' | 'ENTREGUE';
   deliveryDate?: string;
   createdAt: string;

@@ -58,7 +58,7 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
     checkerId: '',
     palletsCount: 1,
     conferenceType: 'ABASTECIMENTO LOJA',
-    specialProducts: [] as string[]
+    specialProducts: [] as { name: string; quantity: number }[]
   });
 
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -74,11 +74,28 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
   const activeBranches = branches.filter(b => b.status === 'ATIVO');
 
   const toggleSpecialProduct = (prod: string) => {
+    setFormData(prev => {
+      const exists = prev.specialProducts.find(p => p.name === prod);
+      if (exists) {
+        return {
+          ...prev,
+          specialProducts: prev.specialProducts.filter(p => p.name !== prod)
+        };
+      } else {
+        return {
+          ...prev,
+          specialProducts: [...prev.specialProducts, { name: prod, quantity: 1 }]
+        };
+      }
+    });
+  };
+
+  const updateSpecialProductQuantity = (name: string, quantity: number) => {
     setFormData(prev => ({
       ...prev,
-      specialProducts: prev.specialProducts.includes(prod)
-        ? prev.specialProducts.filter(p => p !== prod)
-        : [...prev.specialProducts, prod]
+      specialProducts: prev.specialProducts.map(p => 
+        p.name === name ? { ...p, quantity: Math.max(1, quantity) } : p
+      )
     }));
   };
 
@@ -228,19 +245,47 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
               
               <div className="grid grid-cols-2 gap-2">
                 {SPECIAL_PRODUCTS.map(prod => {
-                  const isSelected = formData.specialProducts.includes(prod);
+                  const selection = formData.specialProducts.find(p => p.name === prod);
+                  const isSelected = !!selection;
                   return (
-                    <button
-                      key={prod}
-                      onClick={() => toggleSpecialProduct(prod)}
-                      className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
-                        isSelected 
-                        ? 'bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-100' 
-                        : 'bg-white border-slate-200 text-slate-400 hover:border-orange-200 hover:text-orange-500'
-                      }`}
-                    >
-                      {prod}
-                    </button>
+                    <div key={prod} className="flex flex-col gap-1">
+                      <button
+                        key={prod}
+                        onClick={() => toggleSpecialProduct(prod)}
+                        className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
+                          isSelected 
+                          ? 'bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-100' 
+                          : 'bg-white border-slate-200 text-slate-400 hover:border-orange-200 hover:text-orange-500'
+                        }`}
+                      >
+                        {prod}
+                      </button>
+                      {isSelected && (
+                        <div className="flex items-center bg-white border border-orange-200 rounded-lg overflow-hidden h-8">
+                          <button 
+                            type="button"
+                            onClick={() => updateSpecialProductQuantity(prod, selection.quantity - 1)}
+                            className="px-2 h-full hover:bg-orange-50 text-orange-600 font-bold"
+                          >
+                            -
+                          </button>
+                          <input 
+                            type="number" 
+                            min="1"
+                            className="w-full text-center text-[10px] font-black text-slate-700 outline-none"
+                            value={selection.quantity}
+                            onChange={(e) => updateSpecialProductQuantity(prod, parseInt(e.target.value) || 1)}
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => updateSpecialProductQuantity(prod, selection.quantity + 1)}
+                            className="px-2 h-full hover:bg-orange-50 text-orange-600 font-bold"
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -248,7 +293,14 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
               {formData.specialProducts.length > 0 && (
                 <div className="mt-6 p-4 bg-white rounded-2xl border border-orange-100 animate-in fade-in duration-300">
                    <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-1">Selecionados:</p>
-                   <p className="text-xs font-bold text-slate-600 uppercase italic">{formData.specialProducts.join(' • ')}</p>
+                   <div className="space-y-1">
+                     {formData.specialProducts.map(p => (
+                       <div key={p.name} className="flex justify-between items-center text-xs font-bold text-slate-600 uppercase italic">
+                         <span>{p.name}</span>
+                         <span className="text-orange-600 font-black">Qtd: {p.quantity}</span>
+                       </div>
+                     ))}
+                   </div>
                 </div>
               )}
             </div>

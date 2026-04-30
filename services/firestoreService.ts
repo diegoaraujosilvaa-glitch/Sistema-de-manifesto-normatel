@@ -12,7 +12,7 @@ import {
   Timestamp,
   setDoc
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import { 
   Manifest, 
   LoadingManifest, 
@@ -23,6 +23,53 @@ import {
   DistributionCenter,
   UserProfile 
 } from "../types";
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 // Helper to convert Firebase Timestamp to ISO string
 const formatFirebaseDate = (date: any): string => {
@@ -46,7 +93,7 @@ export const subscribeToManifests = (callback: (data: Manifest[]) => void) => {
     });
     callback(data);
   }, (error) => {
-    console.error("Error subscribing to manifests:", error);
+    handleFirestoreError(error, OperationType.LIST, "manifests");
   });
 };
 
@@ -63,7 +110,7 @@ export const subscribeToLoadingManifests = (callback: (data: LoadingManifest[]) 
     });
     callback(data);
   }, (error) => {
-    console.error("Error subscribing to loading manifests:", error);
+    handleFirestoreError(error, OperationType.LIST, "loading_manifests");
   });
 };
 
@@ -75,8 +122,7 @@ export const saveManifest = async (manifest: Omit<Manifest, 'id'>) => {
     });
     return docRef.id;
   } catch (error) {
-    console.error("Error saving manifest:", error);
-    throw error;
+    handleFirestoreError(error, OperationType.CREATE, "manifests");
   }
 };
 
@@ -98,8 +144,7 @@ export const saveLoadingManifest = async (loadingManifest: Omit<LoadingManifest,
     
     return docRef.id;
   } catch (error) {
-    console.error("Error saving loading manifest:", error);
-    throw error;
+    handleFirestoreError(error, OperationType.CREATE, "loading_manifests");
   }
 };
 
@@ -233,20 +278,20 @@ export const deleteCD = async (id: string) => {
 };
 
 export const deleteManifest = async (id: string) => {
+  const path = `manifests/${id}`;
   try {
     await deleteDoc(doc(db, "manifests", id));
   } catch (error) {
-    console.error("Error deleting manifest:", error);
-    throw error;
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 };
 
 export const deleteLoadingManifest = async (id: string) => {
+  const path = `loading_manifests/${id}`;
   try {
     await deleteDoc(doc(db, "loading_manifests", id));
   } catch (error) {
-    console.error("Error deleting loading manifest:", error);
-    throw error;
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 };
 

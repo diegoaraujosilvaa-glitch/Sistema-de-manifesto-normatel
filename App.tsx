@@ -480,15 +480,22 @@ const App: React.FC = () => {
                       <td className="p-6 text-center">
                         <div className="flex justify-center gap-2">
                           <button onClick={() => generateManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors" title="Imprimir Etiquetas"><Printer size={18}/></button>
-                          <button onClick={async () => {
-                            if (confirm('Deseja excluir este manifesto?')) {
-                              try {
-                                await deleteManifest(m.id);
-                              } catch (e) {
-                                alert('Erro ao excluir manifesto');
+                          {(user.role === 'ADMIN' || user.role === 'ADMINISTRATIVO' || m.createdBy === user.email) && (
+                            <button onClick={async () => {
+                              if (confirm('Deseja excluir este manifesto PERMANENTEMENTE?')) {
+                                try {
+                                  await deleteManifest(m.id);
+                                } catch (e: any) {
+                                  try {
+                                    const errorData = JSON.parse(e.message);
+                                    alert(`Erro ao excluir: ${errorData.error}`);
+                                  } catch {
+                                    alert('Erro ao excluir manifesto: Permissão insuficiente ou erro de rede.');
+                                  }
+                                }
                               }
-                            }
-                          }} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                            }} className="p-2 text-slate-500 hover:text-red-500 transition-colors" title="Excluir Manifesto"><Trash2 size={18}/></button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -901,15 +908,22 @@ const App: React.FC = () => {
                       <td className="p-6 text-center">
                         <div className="flex justify-center gap-2">
                           <button onClick={() => generateLoadingManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors" title="Imprimir Manifesto"><Printer size={18}/></button>
-                          <button onClick={async () => {
-                            if (confirm('Deseja excluir este embarque?')) {
-                              try {
-                                await deleteLoadingManifest(m.id);
-                              } catch (e) {
-                                alert('Erro ao excluir embarque');
+                          {(user.role === 'ADMIN' || user.role === 'ADMINISTRATIVO' || m.createdBy === user.email) && (
+                            <button onClick={async () => {
+                              if (confirm('Deseja excluir este embarque PERMANENTEMENTE?')) {
+                                try {
+                                  await deleteLoadingManifest(m.id);
+                                } catch (e: any) {
+                                  try {
+                                    const errorData = JSON.parse(e.message);
+                                    alert(`Erro ao excluir: ${errorData.error}`);
+                                  } catch {
+                                    alert('Erro ao excluir embarque: Permissão insuficiente ou erro de rede.');
+                                  }
+                                }
                               }
-                            }
-                          }} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                            }} className="p-2 text-slate-500 hover:text-red-500 transition-colors" title="Excluir Embarque"><Trash2 size={18}/></button>
+                          )}
                         </div>
                       </td>
                     </tr>
