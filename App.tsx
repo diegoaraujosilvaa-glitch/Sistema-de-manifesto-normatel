@@ -298,8 +298,8 @@ const App: React.FC = () => {
           <div className="bg-slate-900 p-10 text-center text-white relative">
              <div className="absolute top-0 left-0 w-full h-1 bg-orange-600"></div>
              <LogoNormatel size={64} className="mx-auto mb-4" />
-             <h1 className="text-2xl font-black tracking-tighter uppercase italic">Logística <span className="text-orange-600">Normatel</span></h1>
-             <p className="text-slate-400 text-xs mt-1 font-medium tracking-widest uppercase">Warehouse Control Center</p>
+             <h1 className="text-2xl font-black tracking-tighter uppercase italic">Logística <span className="text-orange-600">Manifesto</span></h1>
+             <p className="text-slate-400 text-xs mt-1 font-medium tracking-widest uppercase">wms</p>
           </div>
           <form onSubmit={handleLogin} className="p-8 space-y-5">
              {loginError && (

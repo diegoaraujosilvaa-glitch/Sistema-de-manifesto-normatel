@@ -69,7 +69,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, activeTab, setActiveTab
             <LogoSmall />
             {!isCollapsed && (
               <div className="flex flex-col animate-in fade-in duration-300">
-                <span className="font-black text-lg text-white leading-none uppercase italic truncate">Normatel</span>
+                <span className="font-black text-lg text-white leading-none uppercase italic truncate">Manifesto</span>
                 <span className="text-[8px] text-orange-500 font-bold uppercase tracking-widest truncate">Logística & CD</span>
               </div>
             )}

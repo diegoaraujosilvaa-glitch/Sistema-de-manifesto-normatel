@@ -28,7 +28,7 @@ export const generateManifestPDF = async (manifest: Manifest, isPreview: boolean
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('LOGÍSTICA NORMATEL - ETIQUETA DE CONFERÊNCIA', pageWidth / 2, 18, { align: 'center' });
+    doc.text('LOGÍSTICA - ETIQUETA DE CONFERÊNCIA', pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(16);
     doc.text(manifest.conferenceType, pageWidth / 2, 28, { align: 'center' });
 

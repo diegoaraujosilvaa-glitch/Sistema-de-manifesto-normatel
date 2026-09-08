@@ -170,7 +170,7 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Conferência de Palete / Volumes</h2>
           </div>
           <div className="px-4 py-1.5 bg-orange-50 rounded-xl border border-orange-100">
-             <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Procedimento Normatel</span>
+             <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Procedimento Manifesto</span>
           </div>
         </div>
 
