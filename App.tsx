@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import ManifestForm from './components/ManifestForm';
 import LoadingManifestForm from './components/LoadingManifestForm';
+import ShippingHistory from './components/ShippingHistory';
 import { 
   UserProfile, 
   Manifest, 
@@ -847,91 +848,26 @@ const App: React.FC = () => {
 
       case 'history':
         return (
-          <div className="space-y-6">
-             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="shrink-0">
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Histórico de Embarques</h3>
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Manifestos de carga finalizados</p>
-              </div>
-
-              <div className="flex flex-col md:flex-row items-center gap-4 flex-1 justify-end">
-                <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100">
-                  <div className="flex flex-col px-2">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Início</span>
-                    <input type="date" className="bg-transparent border-0 p-0 text-[10px] font-bold outline-none" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
-                  </div>
-                  <div className="w-px h-8 bg-slate-200 mx-1"></div>
-                  <div className="flex flex-col px-2">
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Fim</span>
-                    <input type="date" className="bg-transparent border-0 p-0 text-[10px] font-bold outline-none" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="relative w-full md:w-64">
-                  <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                  <input className="w-full pl-12 pr-4 py-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-sm" placeholder="Pesquisar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm overflow-x-auto">
-              <table className="w-full text-left text-sm min-w-[1000px]">
-                <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
-                  <tr>
-                    <th className="p-6">Nº Carga</th>
-                    <th className="p-6">Data Saída</th>
-                    <th className="p-6">Placa</th>
-                    <th className="p-6">Motorista</th>
-                    <th className="p-6">Destino</th>
-                    <th className="p-6 text-center">NFs</th>
-                    <th className="p-6 text-center">Manifestos</th>
-                    <th className="p-6 text-center">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 italic">
-                  {loadingManifests.filter(m => {
-                    const date = m.createdAt.split('T')[0];
-                    const matchesDate = date >= dateRange.start && date <= dateRange.end;
-                    const matchesSearch = m.manifestNumber.includes(searchTerm) || 
-                                        m.vehiclePlate.includes(searchTerm) ||
-                                        (m.driverName || '').toLowerCase().includes(searchTerm.toLowerCase());
-                    return matchesDate && matchesSearch;
-                  }).map(m => (
-                    <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-6 font-black text-slate-800 uppercase tracking-tighter">{m.manifestNumber}</td>
-                      <td className="p-6 text-slate-500 font-bold text-[10px]">{new Date(m.createdAt).toLocaleDateString('pt-BR')}</td>
-                      <td className="p-6"><div className="bg-slate-100 px-3 py-1.5 rounded-lg text-[11px] font-black font-mono inline-block border border-slate-200">{m.vehiclePlate}</div></td>
-                      <td className="p-6 font-bold text-slate-600">{m.driverName}</td>
-                      <td className="p-6 font-black text-slate-800">{m.branchName}</td>
-                      <td className="p-6 text-center font-black text-orange-600">{m.invoices.length}</td>
-                      <td className="p-6 text-center font-black text-slate-400">{m.linkedManifestIds?.length || 0}</td>
-                      <td className="p-6 text-center">
-                        <div className="flex justify-center gap-2">
-                          <button onClick={() => generateLoadingManifestPDF(m)} className="p-2 text-slate-400 hover:text-orange-600 transition-colors" title="Imprimir Manifesto"><Printer size={18}/></button>
-                          {(user.role === 'ADMIN' || user.role === 'ADMINISTRATIVO' || m.createdBy === user.email) && (
-                            <button onClick={async () => {
-                              if (confirm('Deseja excluir este embarque PERMANENTEMENTE?')) {
-                                try {
-                                  await deleteLoadingManifest(m.id);
-                                } catch (e: any) {
-                                  try {
-                                    const errorData = JSON.parse(e.message);
-                                    alert(`Erro ao excluir: ${errorData.error}`);
-                                  } catch {
-                                    alert('Erro ao excluir embarque: Permissão insuficiente ou erro de rede.');
-                                  }
-                                }
-                              }
-                            }} className="p-2 text-slate-500 hover:text-red-500 transition-colors" title="Excluir Embarque"><Trash2 size={18}/></button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ShippingHistory
+            loadingManifests={loadingManifests}
+            manifests={manifests}
+            branches={sortedBranches}
+            user={user}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            onDeleteLoadingManifest={async (id: string) => {
+              try {
+                await deleteLoadingManifest(id);
+              } catch (e: any) {
+                try {
+                  const errorData = JSON.parse(e.message);
+                  alert(`Erro ao excluir: ${errorData.error}`);
+                } catch {
+                  alert('Erro ao excluir embarque: Permissão insuficiente ou erro de rede.');
+                }
+              }
+            }}
+          />
         );
       case 'checkers':
         return (
