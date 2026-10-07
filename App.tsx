@@ -70,6 +70,7 @@ import {
   deleteCD,
   deleteManifest,
   deleteLoadingManifest,
+  updateLoadingManifestEmailSent,
   subscribeToUsers,
   saveUser,
   deleteUser
@@ -1018,6 +1019,10 @@ const App: React.FC = () => {
             user={user}
             dateRange={dateRange}
             setDateRange={setDateRange}
+            onUpdateEmailSent={async (id: string, sent: boolean) => {
+              setLoadingManifests(prev => prev.map(m => m.id === id ? { ...m, emailSent: sent, emailSentAt: sent ? new Date().toISOString() : undefined } : m));
+              await updateLoadingManifestEmailSent(id, sent);
+            }}
             onDeleteLoadingManifest={async (id: string) => {
               try {
                 await deleteLoadingManifest(id);

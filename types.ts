@@ -93,6 +93,8 @@ export interface LoadingManifest {
   branchName: string;
   driverName: string;
   vehiclePlate: string;
+  emailSent?: boolean;
+  emailSentAt?: string;
 }
 
 export interface DashboardStats {

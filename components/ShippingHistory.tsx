@@ -21,12 +21,14 @@ import {
   Clock,
   Filter,
   Mail,
+  MailCheck,
   Send,
   ExternalLink,
   Share2
 } from 'lucide-react';
 import { LoadingManifest, Manifest, Branch, UserProfile, InvoiceItem } from '../types';
 import { generateLoadingManifestPDF, getLoadingManifestPDFBlob } from '../services/pdfGenerator';
+import { updateLoadingManifestEmailSent } from '../services/firestoreService';
 
 interface ShippingHistoryProps {
   loadingManifests: LoadingManifest[];
@@ -36,6 +38,7 @@ interface ShippingHistoryProps {
   dateRange: { start: string; end: string };
   setDateRange: React.Dispatch<React.SetStateAction<{ start: string; end: string }>>;
   onDeleteLoadingManifest: (id: string) => Promise<void>;
+  onUpdateEmailSent?: (id: string, sent: boolean) => Promise<void>;
 }
 
 export interface FlattenedInvoice {
@@ -65,6 +68,7 @@ export const ShippingHistory: React.FC<ShippingHistoryProps> = ({
   dateRange,
   setDateRange,
   onDeleteLoadingManifest,
+  onUpdateEmailSent,
 }) => {
   const [viewMode, setViewMode] = useState<'CARGAS' | 'NOTAS_FISCAIS'>('CARGAS');
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,6 +81,43 @@ export const ShippingHistory: React.FC<ShippingHistoryProps> = ({
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [isCopiedEmailBody, setIsCopiedEmailBody] = useState(false);
+
+  // Email sent tracking (persisted via Firestore and localStorage fallback)
+  const [sentEmailIds, setSentEmailIds] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('sent_manifest_emails');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const isManifestEmailSent = (m?: LoadingManifest | null): boolean => {
+    if (!m) return false;
+    return Boolean(m.emailSent || (m.id && sentEmailIds[m.id]));
+  };
+
+  const markEmailAsSent = async (manifestId: string, sent: boolean = true) => {
+    const timestamp = new Date().toISOString();
+    setSentEmailIds(prev => {
+      const updated = { ...prev };
+      if (sent) {
+        updated[manifestId] = timestamp;
+      } else {
+        delete updated[manifestId];
+      }
+      try { localStorage.setItem('sent_manifest_emails', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    setEmailModalManifest(prev => prev && prev.id === manifestId ? { ...prev, emailSent: sent, emailSentAt: sent ? timestamp : undefined } : prev);
+
+    if (onUpdateEmailSent) {
+      await onUpdateEmailSent(manifestId, sent);
+    } else {
+      await updateLoadingManifestEmailSent(manifestId, sent);
+    }
+  };
 
   const openEmailModal = (m: LoadingManifest) => {
     const branch = branches.find(b => b.id === m.branchId || (b.name && b.name.toLowerCase() === (m.branchName || '').toLowerCase()));
@@ -114,6 +155,7 @@ Expedição / Logística`;
 
   const handleDirectShare = async (m: LoadingManifest) => {
     try {
+      await markEmailAsSent(m.id, true);
       const blob = await getLoadingManifestPDFBlob(m);
       const fileName = `Manifesto_Carga_${m.manifestNumber}.pdf`;
       const file = new File([blob], fileName, { type: 'application/pdf' });
@@ -256,6 +298,10 @@ Expedição / Logística`;
     return set.size;
   }, [filteredLoadingManifests]);
 
+  const totalEmailsDisparados = useMemo(() => {
+    return filteredLoadingManifests.filter(m => isManifestEmailSent(m)).length;
+  }, [filteredLoadingManifests, sentEmailIds]);
+
   // Export filtered NFs to CSV
   const handleExportCSV = () => {
     if (filteredInvoices.length === 0) {
@@ -350,6 +396,20 @@ Expedição / Logística`;
             <div className="px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-2.5 shrink-0">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filiais:</span>
               <span className="text-sm font-black text-slate-800 font-mono">{distinctBranches}</span>
+            </div>
+            <div 
+              className={`px-4 py-2 rounded-2xl border flex items-center gap-2.5 shrink-0 transition-colors ${
+                totalEmailsDisparados > 0 
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                  : 'bg-slate-50 border-slate-100 text-slate-400'
+              }`}
+              title="Embarques com disparo de e-mail realizado"
+            >
+              <MailCheck size={14} className={totalEmailsDisparados > 0 ? 'text-emerald-600' : 'text-slate-400'} />
+              <span className="text-[10px] font-black uppercase tracking-widest">E-mails Enviados:</span>
+              <span className="text-sm font-black font-mono">
+                {totalEmailsDisparados}/{totalCargas}
+              </span>
             </div>
           </div>
 
@@ -585,13 +645,29 @@ Expedição / Logística`;
                             >
                               <Printer size={18} />
                             </button>
-                            <button
-                              onClick={() => openEmailModal(inv.rawManifest)}
-                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                              title="Enviar Embarque por E-mail"
-                            >
-                              <Mail size={18} />
-                            </button>
+                            {(() => {
+                              const isSent = isManifestEmailSent(inv.rawManifest);
+                              return (
+                                <button
+                                  onClick={() => openEmailModal(inv.rawManifest)}
+                                  className={`p-2 rounded-xl transition-all relative ${
+                                    isSent
+                                      ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700 border border-emerald-200 shadow-sm'
+                                      : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                                  }`}
+                                  title={isSent ? 'E-mail do embarque já disparado para a loja! Clique para reenviar ou consultar' : 'Enviar Embarque por E-mail'}
+                                >
+                                  {isSent ? (
+                                    <>
+                                      <MailCheck size={18} className="text-emerald-600" />
+                                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
+                                    </>
+                                  ) : (
+                                    <Mail size={18} />
+                                  )}
+                                </button>
+                              );
+                            })()}
                           </div>
                         </td>
                       </tr>
@@ -690,13 +766,29 @@ Expedição / Logística`;
                         >
                           <Printer size={18} />
                         </button>
-                        <button 
-                          onClick={() => openEmailModal(m)} 
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" 
-                          title="Enviar Manifesto por E-mail"
-                        >
-                          <Mail size={18} />
-                        </button>
+                        {(() => {
+                          const isSent = isManifestEmailSent(m);
+                          return (
+                            <button 
+                              onClick={() => openEmailModal(m)} 
+                              className={`p-2 rounded-xl transition-all relative ${
+                                isSent 
+                                  ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700 border border-emerald-200 shadow-sm' 
+                                  : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                              }`} 
+                              title={isSent ? 'E-mail disparado para a loja! Clique para reenviar ou consultar' : 'Enviar Manifesto por E-mail'}
+                            >
+                              {isSent ? (
+                                <>
+                                  <MailCheck size={18} className="text-emerald-600" />
+                                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
+                                </>
+                              ) : (
+                                <Mail size={18} />
+                              )}
+                            </button>
+                          );
+                        })()}
                         {(user.role === 'ADMIN' || user.role === 'ADMINISTRATIVO' || m.createdBy === user.email) && (
                           <button 
                             onClick={async () => {
@@ -877,18 +969,27 @@ Expedição / Logística`;
                 Fechar
               </button>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const raw = selectedInvoice.rawManifest;
-                    setSelectedInvoice(null);
-                    openEmailModal(raw);
-                  }}
-                  className="px-5 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm"
-                  title="Enviar por E-mail para a Filial"
-                >
-                  <Mail size={16} />
-                  Enviar por E-mail
-                </button>
+                {(() => {
+                  const isSent = isManifestEmailSent(selectedInvoice.rawManifest);
+                  return (
+                    <button
+                      onClick={() => {
+                        const raw = selectedInvoice.rawManifest;
+                        setSelectedInvoice(null);
+                        openEmailModal(raw);
+                      }}
+                      className={`px-5 py-3 font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm ${
+                        isSent
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 shadow-md'
+                          : 'bg-slate-800 hover:bg-slate-900 text-white'
+                      }`}
+                      title={isSent ? 'E-mail deste embarque já foi disparado para a loja' : 'Enviar por E-mail para a Filial'}
+                    >
+                      {isSent ? <MailCheck size={16} /> : <Mail size={16} />}
+                      {isSent ? 'E-mail Disparado' : 'Enviar por E-mail'}
+                    </button>
+                  );
+                })()}
                 <button
                   onClick={() => generateLoadingManifestPDF(selectedInvoice.rawManifest)}
                   className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-orange-200"
@@ -1026,18 +1127,27 @@ Expedição / Logística`;
                 Fechar
               </button>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const m = selectedLoadingManifest;
-                    setSelectedLoadingManifest(null);
-                    openEmailModal(m);
-                  }}
-                  className="px-5 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm"
-                  title="Enviar Notificação por E-mail"
-                >
-                  <Mail size={16} />
-                  Enviar por E-mail
-                </button>
+                {(() => {
+                  const isSent = isManifestEmailSent(selectedLoadingManifest);
+                  return (
+                    <button
+                      onClick={() => {
+                        const m = selectedLoadingManifest;
+                        setSelectedLoadingManifest(null);
+                        openEmailModal(m);
+                      }}
+                      className={`px-5 py-3 font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm ${
+                        isSent
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 shadow-md'
+                          : 'bg-slate-800 hover:bg-slate-900 text-white'
+                      }`}
+                      title={isSent ? 'E-mail deste embarque já foi disparado para a loja' : 'Enviar Notificação por E-mail'}
+                    >
+                      {isSent ? <MailCheck size={16} /> : <Mail size={16} />}
+                      {isSent ? 'E-mail Disparado' : 'Enviar por E-mail'}
+                    </button>
+                  );
+                })()}
                 <button
                   onClick={() => generateLoadingManifestPDF(selectedLoadingManifest)}
                   className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-orange-200"
@@ -1058,13 +1168,22 @@ Expedição / Logística`;
             {/* Modal Header */}
             <div className="bg-slate-900 text-white p-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-orange-600 flex items-center justify-center text-white">
-                  <Mail size={20} />
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white transition-colors ${
+                  isManifestEmailSent(emailModalManifest) ? 'bg-emerald-600' : 'bg-orange-600'
+                }`}>
+                  {isManifestEmailSent(emailModalManifest) ? <MailCheck size={20} /> : <Mail size={20} />}
                 </div>
                 <div>
-                  <span className="text-[10px] text-orange-400 font-black uppercase tracking-widest">
-                    Notificação de Embarque
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-orange-400 font-black uppercase tracking-widest">
+                      Notificação de Embarque
+                    </span>
+                    {isManifestEmailSent(emailModalManifest) && (
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                        <Check size={10} /> Disparado
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-xl font-black uppercase tracking-tight">
                     Enviar para {emailModalManifest.branchName}
                   </h3>
@@ -1080,6 +1199,58 @@ Expedição / Logística`;
 
             {/* Modal Body */}
             <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+              {/* Status Banner */}
+              {isManifestEmailSent(emailModalManifest) ? (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-emerald-900 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                      <MailCheck size={18} />
+                    </div>
+                    <div>
+                      <span className="font-black text-xs text-emerald-800 block">
+                        E-mail Sinalizado como DISPARADO
+                      </span>
+                      <span className="text-[11px] text-emerald-700">
+                        O ícone deste embarque está <strong className="font-bold underline decoration-emerald-500">verde</strong> na listagem para confirmação visual de envio.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => markEmailAsSent(emailModalManifest.id, false)}
+                    className="px-3 py-1.5 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 rounded-xl text-[11px] font-bold transition-colors shadow-sm shrink-0"
+                    title="Desmarcar status de disparado"
+                  >
+                    Desmarcar
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-slate-700">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-500 flex items-center justify-center shrink-0">
+                      <Mail size={16} />
+                    </div>
+                    <div>
+                      <span className="font-bold text-xs text-slate-700 block">
+                        Status de Disparo: Pendente
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        O ícone ficará <strong className="font-bold text-emerald-700">verde</strong> automaticamente ao abrir o Gmail, Outlook ou Compartilhar.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => markEmailAsSent(emailModalManifest.id, true)}
+                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[11px] font-black transition-colors flex items-center gap-1 shadow-sm shrink-0"
+                    title="Marcar manualmente como disparado"
+                  >
+                    <Check size={13} />
+                    Marcar Disparado
+                  </button>
+                </div>
+              )}
+
               <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-3 text-blue-900">
                 <Mail size={18} className="text-blue-600 shrink-0 mt-0.5" />
                 <div className="space-y-1 text-xs">
@@ -1190,7 +1361,8 @@ Expedição / Logística`;
                 {/* Outlook Web Compose (Office 365) with safe body length */}
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
+                    await markEmailAsSent(emailModalManifest.id, true);
                     navigator.clipboard.writeText(emailBody);
                     setIsCopiedEmailBody(true);
                     generateLoadingManifestPDF(emailModalManifest);
@@ -1199,7 +1371,7 @@ Expedição / Logística`;
                     window.open(outlookUrl, '_blank');
                   }}
                   className="px-4 py-3 bg-[#0078d4] hover:bg-[#0060aa] text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg shadow-blue-200"
-                  title="Baixa o PDF do manifesto e abre o Outlook Web (Office 365) no navegador sem erro de tamanho de link"
+                  title="Baixa o PDF do manifesto, marca como disparado e abre o Outlook Web (Office 365) no navegador"
                 >
                   <ExternalLink size={15} />
                   Outlook Web (365)
@@ -1208,7 +1380,8 @@ Expedição / Logística`;
                 {/* Gmail Web Compose with safe body length */}
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
+                    await markEmailAsSent(emailModalManifest.id, true);
                     navigator.clipboard.writeText(emailBody);
                     setIsCopiedEmailBody(true);
                     generateLoadingManifestPDF(emailModalManifest);
@@ -1217,7 +1390,7 @@ Expedição / Logística`;
                     window.open(gmailUrl, '_blank');
                   }}
                   className="px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg shadow-orange-200"
-                  title="Baixa o PDF do manifesto e abre a janela de composição do Gmail já preenchida"
+                  title="Baixa o PDF do manifesto, marca como disparado e abre a janela de composição do Gmail já preenchida"
                 >
                   <ExternalLink size={15} />
                   Gmail Web
@@ -1226,12 +1399,13 @@ Expedição / Logística`;
                 {/* App Desktop (Mailto) */}
                 <a
                   href={`mailto:${encodeURIComponent(emailRecipient)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(getSafeUrlBody(emailModalManifest))}`}
-                  onClick={() => {
+                  onClick={async () => {
+                    await markEmailAsSent(emailModalManifest.id, true);
                     navigator.clipboard.writeText(emailBody);
                     generateLoadingManifestPDF(emailModalManifest);
                   }}
                   className="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 border border-slate-200"
-                  title="Abre o aplicativo de e-mail padrão do computador"
+                  title="Abre o aplicativo de e-mail padrão do computador e marca como disparado"
                 >
                   <Mail size={15} />
                   App Desktop

@@ -305,6 +305,18 @@ export const deleteLoadingManifest = async (id: string) => {
   }
 };
 
+export const updateLoadingManifestEmailSent = async (id: string, sent: boolean = true) => {
+  try {
+    const manifestRef = doc(db, "loading_manifests", id);
+    await updateDoc(manifestRef, {
+      emailSent: sent,
+      emailSentAt: sent ? new Date().toISOString() : null
+    });
+  } catch (error) {
+    console.error("Error updating emailSent status:", error);
+  }
+};
+
 export const subscribeToUsers = (callback: (data: UserProfile[]) => void) => {
   return onSnapshot(collection(db, "users"), (snapshot) => {
     callback(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile)));
