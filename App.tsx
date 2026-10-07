@@ -43,7 +43,8 @@ import {
   Building2,
   PlusCircle,
   UserCheck,
-  Loader2
+  Loader2,
+  Pencil
 } from 'lucide-react';
 import { generateManifestPDF, generateLoadingManifestPDF } from './services/pdfGenerator';
 import { 
@@ -60,6 +61,7 @@ import {
   saveDriver,
   saveVehicle,
   saveBranch,
+  updateBranch,
   saveCD,
   deleteChecker,
   deleteDriver,
@@ -176,7 +178,7 @@ const App: React.FC = () => {
   const [newChecker, setNewChecker] = useState({ name: '', externalId: '' });
   const [newDriver, setNewDriver] = useState({ name: '', document: '', phone: '' });
   const [newVehicle, setNewVehicle] = useState({ plate: '', model: '', type: 'TRUCK' });
-  const [newBranch, setNewBranch] = useState({ name: '', code: '', city: '', state: '' });
+  const [newBranch, setNewBranch] = useState({ name: '', code: '', city: '', state: '', email: '' });
   const [newCD, setNewCD] = useState({ name: '', code: '' });
 
   useEffect(() => { localStorage.setItem('logi_all_users', JSON.stringify(allUsers)); }, [allUsers]);
@@ -268,14 +270,42 @@ const App: React.FC = () => {
     }
   };
 
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+
   const addBranch = async () => {
     if (newBranch.name && newBranch.code) {
       try {
         await saveBranch({ ...newBranch, status: 'ATIVO' });
-        setNewBranch({ name: '', code: '', city: '', state: '' });
+        setNewBranch({ name: '', code: '', city: '', state: '', email: '' });
         setShowForm(false);
       } catch (e) {
         alert('Erro ao salvar filial');
+      }
+    }
+  };
+
+  const handleUpdateBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBranch) return;
+    try {
+      const { id, ...data } = editingBranch;
+      setBranches(prev => prev.map(b => b.id === id ? { ...b, ...data } : b));
+      await updateBranch(id, data);
+      setEditingBranch(null);
+    } catch (e: any) {
+      console.error('Erro ao atualizar filial:', e);
+      alert('Erro ao atualizar filial: ' + (e?.message || 'Verifique a conexão'));
+    }
+  };
+
+  const handleDeleteBranch = async (branch: Branch) => {
+    if (confirm(`Deseja realmente excluir a filial "${branch.name}" (${branch.code})?`)) {
+      try {
+        setBranches(prev => prev.filter(b => b.id !== branch.id));
+        await deleteBranch(branch.id);
+      } catch (e: any) {
+        console.error('Erro ao excluir filial:', e);
+        alert('Erro ao excluir filial: ' + (e?.message || 'Verifique as permissões'));
       }
     }
   };
@@ -812,6 +842,10 @@ const App: React.FC = () => {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estado (UF)</label>
                     <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none" placeholder="CE" maxLength={2} value={newBranch.state} onChange={e => setNewBranch({...newBranch, state: e.target.value.toUpperCase()})} />
                   </div>
+                  <div className="space-y-1 md:col-span-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mails de Notificação da Loja (separar por vírgula se houver mais de um)</label>
+                    <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none text-xs font-medium" placeholder="Ex: loja.filial@normatel.com.br, gerente@normatel.com.br" value={newBranch.email} onChange={e => setNewBranch({...newBranch, email: e.target.value})} />
+                  </div>
                 </div>
                 <div className="flex justify-end gap-3">
                   <button onClick={addBranch} className="px-8 py-4 bg-orange-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-lg shadow-orange-100">Salvar Filial</button>
@@ -828,21 +862,150 @@ const App: React.FC = () => {
                     <span className="text-orange-600 font-black text-2xl tracking-tighter mb-2 block">{b.code}</span>
                     <h4 className="font-black text-slate-800 uppercase tracking-tighter text-sm mb-1 leading-tight">{b.name}</h4>
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{b.city} - {b.state}</p>
-                    <div className="mt-6 flex justify-between items-center">
-                       <span className="flex items-center gap-1 text-[8px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-2 py-0.5 rounded-full"><CheckCircle2 size={10} /> Operando</span>
-                       <button onClick={async () => {
-                         if (confirm('Deseja excluir esta filial?')) {
-                           try {
-                             await deleteBranch(b.id);
-                           } catch (e) {
-                             alert('Erro ao excluir filial');
-                           }
-                         }
-                       }} className="text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                    {b.email && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500 font-medium truncate" title={b.email}>
+                        <span className="text-orange-500 font-bold">✉</span>
+                        <span className="truncate">{b.email}</span>
+                      </div>
+                    )}
+                    <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
+                       <span className="flex items-center gap-1 text-[8px] font-black text-green-600 uppercase tracking-widest bg-green-50 px-2 py-0.5 rounded-full">
+                         <CheckCircle2 size={10} /> {b.status || 'Operando'}
+                       </span>
+                       <div className="flex items-center gap-1.5">
+                         <button 
+                           onClick={() => setEditingBranch(b)} 
+                           className="px-2.5 py-1.5 bg-slate-100 hover:bg-orange-50 hover:text-orange-600 rounded-xl text-slate-600 transition-all flex items-center gap-1 text-[11px] font-bold"
+                           title="Editar Filial"
+                         >
+                           <Pencil size={13} />
+                           <span>Editar</span>
+                         </button>
+                         <button 
+                           onClick={() => handleDeleteBranch(b)} 
+                           className="px-2.5 py-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 rounded-xl text-slate-600 transition-all flex items-center gap-1 text-[11px] font-bold"
+                           title="Excluir Filial"
+                         >
+                           <Trash2 size={13} />
+                           <span>Excluir</span>
+                         </button>
+                       </div>
                     </div>
                  </div>
                ))}
             </div>
+
+            {/* Modal: Editar Filial */}
+            {editingBranch && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                  <div className="bg-slate-900 text-white p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-orange-600 flex items-center justify-center text-white">
+                        <Building2 size={20} />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-orange-400 font-black uppercase tracking-widest">
+                          Alterar Cadastro
+                        </span>
+                        <h3 className="text-xl font-black uppercase tracking-tight">
+                          Editar Filial {editingBranch.code}
+                        </h3>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setEditingBranch(null)}
+                      className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleUpdateBranch} className="p-6 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cód. Filial</label>
+                        <input 
+                          className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-black text-orange-600 uppercase" 
+                          value={editingBranch.code} 
+                          onChange={e => setEditingBranch({...editingBranch, code: e.target.value.toUpperCase()})} 
+                          required 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                        <select 
+                          className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-xs"
+                          value={editingBranch.status || 'ATIVO'}
+                          onChange={e => setEditingBranch({...editingBranch, status: e.target.value as 'ATIVO' | 'INATIVO'})}
+                        >
+                          <option value="ATIVO">ATIVO (OPERANDO)</option>
+                          <option value="INATIVO">INATIVO</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia da Loja</label>
+                      <input 
+                        className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-slate-800" 
+                        value={editingBranch.name} 
+                        onChange={e => setEditingBranch({...editingBranch, name: e.target.value})} 
+                        required 
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cidade</label>
+                        <input 
+                          className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-xs" 
+                          value={editingBranch.city} 
+                          onChange={e => setEditingBranch({...editingBranch, city: e.target.value})} 
+                          required 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estado (UF)</label>
+                        <input 
+                          className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold uppercase text-xs" 
+                          maxLength={2} 
+                          value={editingBranch.state} 
+                          onChange={e => setEditingBranch({...editingBranch, state: e.target.value.toUpperCase()})} 
+                          required 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mails de Notificação da Loja (separar por vírgula)</label>
+                      <input 
+                        className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-xs" 
+                        placeholder="Ex: loja.filial@normatel.com.br, gerente@normatel.com.br"
+                        value={editingBranch.email || ''} 
+                        onChange={e => setEditingBranch({...editingBranch, email: e.target.value})} 
+                      />
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <button 
+                        type="button" 
+                        onClick={() => setEditingBranch(null)} 
+                        className="px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        type="submit" 
+                        className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-orange-200"
+                      >
+                        Salvar Alterações
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         );
 

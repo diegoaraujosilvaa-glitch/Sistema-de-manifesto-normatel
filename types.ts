@@ -39,6 +39,7 @@ export interface Branch {
   city: string;
   state: string;
   status: 'ATIVO' | 'INATIVO';
+  email?: string;
 }
 
 export interface DistributionCenter {

@@ -249,6 +249,16 @@ export const saveBranch = async (branch: Omit<Branch, 'id'>) => {
   }
 };
 
+export const updateBranch = async (id: string, branch: Partial<Omit<Branch, 'id'>>) => {
+  try {
+    const branchRef = doc(db, "branches", id);
+    await updateDoc(branchRef, branch);
+  } catch (error) {
+    console.error("Error updating branch:", error);
+    throw error;
+  }
+};
+
 export const deleteBranch = async (id: string) => {
   try {
     await deleteDoc(doc(db, "branches", id));

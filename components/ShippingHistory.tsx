@@ -19,10 +19,14 @@ import {
   ArrowRight,
   ClipboardList,
   Clock,
-  Filter
+  Filter,
+  Mail,
+  Send,
+  ExternalLink,
+  Share2
 } from 'lucide-react';
 import { LoadingManifest, Manifest, Branch, UserProfile, InvoiceItem } from '../types';
-import { generateLoadingManifestPDF } from '../services/pdfGenerator';
+import { generateLoadingManifestPDF, getLoadingManifestPDFBlob } from '../services/pdfGenerator';
 
 interface ShippingHistoryProps {
   loadingManifests: LoadingManifest[];
@@ -68,6 +72,90 @@ export const ShippingHistory: React.FC<ShippingHistoryProps> = ({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [selectedLoadingManifest, setSelectedLoadingManifest] = useState<LoadingManifest | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<FlattenedInvoice | null>(null);
+  const [emailModalManifest, setEmailModalManifest] = useState<LoadingManifest | null>(null);
+  const [emailRecipient, setEmailRecipient] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [isCopiedEmailBody, setIsCopiedEmailBody] = useState(false);
+
+  const openEmailModal = (m: LoadingManifest) => {
+    const branch = branches.find(b => b.id === m.branchId || (b.name && b.name.toLowerCase() === (m.branchName || '').toLowerCase()));
+    const recipient = branch?.email || '';
+    const subject = `[LOGÍSTICA] Manifesto de Carga ${m.manifestNumber} - Destino: ${m.branchName} - Placa ${m.vehiclePlate}`;
+    const nfsList = (m.invoices || []).map((inv, idx) => `• NF ${inv.number} (Palete: ${inv.manifestNumber || '-'}) | Chave: ${inv.key}`).join('\n');
+    const body = `Prezados da loja ${m.branchName},
+
+Informamos que o embarque ${m.manifestNumber} foi expedido pelo Centro de Distribuição (${m.cdName}).
+
+DADOS DO TRANSPORTE:
+- Nº da Carga: ${m.manifestNumber}
+- Filial de Destino: ${m.branchName}
+- Veículo (Placa): ${m.vehiclePlate}
+- Motorista: ${m.driverName}
+- Nº do Lacre: ${m.sealNumber || 'NÃO INFORMADO'}
+- Data de Saída: ${new Date(m.createdAt).toLocaleDateString('pt-BR')} às ${m.exitTime}
+- Previsão de Entrega: ${new Date(m.deliveryDate).toLocaleDateString('pt-BR')}
+- Quantidade de NFs: ${m.invoices?.length || 0} nota(s) fiscal(is)
+
+RELAÇÃO DE NOTAS FISCAIS EMBARCADAS:
+${nfsList || 'Nenhuma nota vinculada.'}
+
+O Manifesto de Carga completo em PDF pode ser conferido e anexado para recepção da mercadoria.
+
+Atenciosamente,
+Expedição / Logística`;
+
+    setEmailRecipient(recipient);
+    setEmailSubject(subject);
+    setEmailBody(body);
+    setEmailModalManifest(m);
+    setIsCopiedEmailBody(false);
+  };
+
+  const handleDirectShare = async (m: LoadingManifest) => {
+    try {
+      const blob = await getLoadingManifestPDFBlob(m);
+      const fileName = `Manifesto_Carga_${m.manifestNumber}.pdf`;
+      const file = new File([blob], fileName, { type: 'application/pdf' });
+      if (typeof navigator !== 'undefined' && 'canShare' in navigator && (navigator as any).canShare({ files: [file] })) {
+        await (navigator as any).share({
+          title: emailSubject,
+          text: emailBody,
+          files: [file]
+        });
+      } else {
+        // Fallback for browsers that do not support files in Web Share
+        generateLoadingManifestPDF(m);
+        const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(emailRecipient)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+        window.open(outlookUrl, '_blank');
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') {
+        console.error('Erro ao compartilhar:', e);
+      }
+    }
+  };
+
+  const getSafeUrlBody = (m: LoadingManifest): string => {
+    return `Prezados da loja ${m.branchName},
+
+Informamos que o embarque ${m.manifestNumber} foi expedido pelo CD (${m.cdName}).
+
+DADOS DO TRANSPORTE:
+• Carga: ${m.manifestNumber}
+• Destino: ${m.branchName}
+• Veículo / Placa: ${m.vehiclePlate}
+• Motorista: ${m.driverName}
+• Lacre: ${m.sealNumber || 'NÃO INFORMADO'}
+• Saída: ${new Date(m.createdAt).toLocaleDateString('pt-BR')} às ${m.exitTime}
+• Previsão de Entrega: ${new Date(m.deliveryDate).toLocaleDateString('pt-BR')}
+• Quantidade de NFs: ${m.invoices?.length || 0} nota(s) fiscal(is)
+
+(O PDF do Manifesto de Carga foi baixado e a lista completa de NFs foi copiada para área de transferência).
+
+Atenciosamente,
+Expedição / Logística`;
+  };
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -497,6 +585,13 @@ export const ShippingHistory: React.FC<ShippingHistoryProps> = ({
                             >
                               <Printer size={18} />
                             </button>
+                            <button
+                              onClick={() => openEmailModal(inv.rawManifest)}
+                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                              title="Enviar Embarque por E-mail"
+                            >
+                              <Mail size={18} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -594,6 +689,13 @@ export const ShippingHistory: React.FC<ShippingHistoryProps> = ({
                           title="Imprimir Manifesto"
                         >
                           <Printer size={18} />
+                        </button>
+                        <button 
+                          onClick={() => openEmailModal(m)} 
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" 
+                          title="Enviar Manifesto por E-mail"
+                        >
+                          <Mail size={18} />
                         </button>
                         {(user.role === 'ADMIN' || user.role === 'ADMINISTRATIVO' || m.createdBy === user.email) && (
                           <button 
@@ -767,20 +869,34 @@ export const ShippingHistory: React.FC<ShippingHistoryProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <button
                 onClick={() => setSelectedInvoice(null)}
                 className="px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-colors"
               >
                 Fechar
               </button>
-              <button
-                onClick={() => generateLoadingManifestPDF(selectedInvoice.rawManifest)}
-                className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-orange-200"
-              >
-                <Printer size={16} />
-                Imprimir Manifesto Completo
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const raw = selectedInvoice.rawManifest;
+                    setSelectedInvoice(null);
+                    openEmailModal(raw);
+                  }}
+                  className="px-5 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm"
+                  title="Enviar por E-mail para a Filial"
+                >
+                  <Mail size={16} />
+                  Enviar por E-mail
+                </button>
+                <button
+                  onClick={() => generateLoadingManifestPDF(selectedInvoice.rawManifest)}
+                  className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-orange-200"
+                >
+                  <Printer size={16} />
+                  Imprimir Manifesto Completo
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -902,20 +1018,225 @@ export const ShippingHistory: React.FC<ShippingHistoryProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <button
                 onClick={() => setSelectedLoadingManifest(null)}
                 className="px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-colors"
               >
                 Fechar
               </button>
-              <button
-                onClick={() => generateLoadingManifestPDF(selectedLoadingManifest)}
-                className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-orange-200"
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const m = selectedLoadingManifest;
+                    setSelectedLoadingManifest(null);
+                    openEmailModal(m);
+                  }}
+                  className="px-5 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm"
+                  title="Enviar Notificação por E-mail"
+                >
+                  <Mail size={16} />
+                  Enviar por E-mail
+                </button>
+                <button
+                  onClick={() => generateLoadingManifestPDF(selectedLoadingManifest)}
+                  className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-orange-200"
+                >
+                  <Printer size={16} />
+                  Imprimir Manifesto de Carga
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ENVIAR EMBARQUE / MANIFESTO POR E-MAIL */}
+      {emailModalManifest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-600 flex items-center justify-center text-white">
+                  <Mail size={20} />
+                </div>
+                <div>
+                  <span className="text-[10px] text-orange-400 font-black uppercase tracking-widest">
+                    Notificação de Embarque
+                  </span>
+                  <h3 className="text-xl font-black uppercase tracking-tight">
+                    Enviar para {emailModalManifest.branchName}
+                  </h3>
+                </div>
+              </div>
+              <button 
+                onClick={() => setEmailModalManifest(null)}
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
               >
-                <Printer size={16} />
-                Imprimir Manifesto de Carga
+                <X size={20} />
               </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-3 text-blue-900">
+                <Mail size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 text-xs">
+                  <p className="font-bold">
+                    Destinatários da Loja e Anexo Automático:
+                  </p>
+                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                    Ao clicar em <strong>Outlook Web</strong> ou <strong>Gmail Web</strong>, o sistema abre o e-mail com o resumo da carga, faz o download automático do PDF do Manifesto para anexo e copia a lista completa de NFs para você colar (Ctrl+V) sem atingir limites de tamanho de link.
+                  </p>
+                </div>
+              </div>
+
+              {/* Recipient Input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                  E-mails Destinatários (separar por vírgula se houver mais de um)
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-slate-800"
+                  placeholder="ex: loja.filial@normatel.com.br, gerencia@normatel.com.br"
+                  value={emailRecipient}
+                  onChange={e => setEmailRecipient(e.target.value)}
+                />
+              </div>
+
+              {/* Subject Input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                  Assunto da Mensagem
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-slate-800"
+                  value={emailSubject}
+                  onChange={e => setEmailSubject(e.target.value)}
+                />
+              </div>
+
+              {/* Body Area */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Conteúdo da Notificação / Relação das NFs
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(emailBody);
+                      setIsCopiedEmailBody(true);
+                      setTimeout(() => setIsCopiedEmailBody(false), 2000);
+                    }}
+                    className="text-[10px] font-bold text-orange-600 hover:underline flex items-center gap-1"
+                  >
+                    {isCopiedEmailBody ? <Check size={12} className="text-green-600" /> : <Copy size={12} />}
+                    {isCopiedEmailBody ? 'Texto Copiado!' : 'Copiar Texto'}
+                  </button>
+                </div>
+                <textarea
+                  rows={7}
+                  className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-mono text-[11px] text-slate-700 leading-relaxed"
+                  value={emailBody}
+                  onChange={e => setEmailBody(e.target.value)}
+                />
+              </div>
+
+              {/* Anexo info */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText size={16} className="text-orange-600" />
+                  <span className="font-bold text-slate-700 text-xs">
+                    Anexo: Manifesto_Carga_{emailModalManifest.manifestNumber}.pdf
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => generateLoadingManifestPDF(emailModalManifest)}
+                  className="px-3 py-1.5 bg-white hover:bg-orange-50 border border-slate-200 rounded-xl text-xs font-bold text-orange-600 flex items-center gap-1.5 transition-colors"
+                >
+                  <Download size={13} />
+                  Baixar PDF para Anexar
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setEmailModalManifest(null)}
+                className="px-5 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-colors"
+              >
+                Cancelar
+              </button>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Direct Share with attached file (if supported by OS/browser) */}
+                <button
+                  type="button"
+                  onClick={() => handleDirectShare(emailModalManifest)}
+                  className="px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm"
+                  title="Compartilha diretamente com o arquivo PDF já anexado"
+                >
+                  <Share2 size={15} />
+                  Compartilhar c/ Anexo
+                </button>
+
+                {/* Outlook Web Compose (Office 365) with safe body length */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(emailBody);
+                    setIsCopiedEmailBody(true);
+                    generateLoadingManifestPDF(emailModalManifest);
+                    const safeBody = getSafeUrlBody(emailModalManifest);
+                    const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(emailRecipient)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(safeBody)}`;
+                    window.open(outlookUrl, '_blank');
+                  }}
+                  className="px-4 py-3 bg-[#0078d4] hover:bg-[#0060aa] text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg shadow-blue-200"
+                  title="Baixa o PDF do manifesto e abre o Outlook Web (Office 365) no navegador sem erro de tamanho de link"
+                >
+                  <ExternalLink size={15} />
+                  Outlook Web (365)
+                </button>
+
+                {/* Gmail Web Compose with safe body length */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(emailBody);
+                    setIsCopiedEmailBody(true);
+                    generateLoadingManifestPDF(emailModalManifest);
+                    const safeBody = getSafeUrlBody(emailModalManifest);
+                    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailRecipient)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(safeBody)}`;
+                    window.open(gmailUrl, '_blank');
+                  }}
+                  className="px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg shadow-orange-200"
+                  title="Baixa o PDF do manifesto e abre a janela de composição do Gmail já preenchida"
+                >
+                  <ExternalLink size={15} />
+                  Gmail Web
+                </button>
+
+                {/* App Desktop (Mailto) */}
+                <a
+                  href={`mailto:${encodeURIComponent(emailRecipient)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(getSafeUrlBody(emailModalManifest))}`}
+                  onClick={() => {
+                    navigator.clipboard.writeText(emailBody);
+                    generateLoadingManifestPDF(emailModalManifest);
+                  }}
+                  className="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 border border-slate-200"
+                  title="Abre o aplicativo de e-mail padrão do computador"
+                >
+                  <Mail size={15} />
+                  App Desktop
+                </a>
+              </div>
             </div>
           </div>
         </div>

@@ -121,7 +121,7 @@ export const generateManifestPDF = async (manifest: Manifest, isPreview: boolean
   }
 };
 
-export const generateLoadingManifestPDF = async (data: LoadingManifest, isPreview: boolean = false): Promise<string | null> => {
+export const buildLoadingManifestDoc = async (data: LoadingManifest): Promise<jsPDF> => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   
@@ -215,6 +215,16 @@ export const generateLoadingManifestPDF = async (data: LoadingManifest, isPrevie
   doc.line(pageWidth - 80, footerY, pageWidth - 20, footerY);
   doc.text('ASSINATURA MOTORISTA', pageWidth - 70, footerY + 5);
 
+  return doc;
+};
+
+export const getLoadingManifestPDFBlob = async (data: LoadingManifest): Promise<Blob> => {
+  const doc = await buildLoadingManifestDoc(data);
+  return doc.output('blob');
+};
+
+export const generateLoadingManifestPDF = async (data: LoadingManifest, isPreview: boolean = false): Promise<string | null> => {
+  const doc = await buildLoadingManifestDoc(data);
   if (isPreview) {
     const blob = doc.output('blob');
     return URL.createObjectURL(blob);
