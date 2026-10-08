@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import { Manifest, LoadingManifest } from '../types';
+import { formatDateBR } from './dateUtils';
 
 export const generateManifestPDF = async (manifest: Manifest, isPreview: boolean = false): Promise<string | null> => {
   const doc = new jsPDF({
@@ -61,7 +62,7 @@ export const generateManifestPDF = async (manifest: Manifest, isPreview: boolean
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.text(`ORIGEM: ${manifest.cdName}`, 20, 142);
-    doc.text(`DATA: ${new Date(manifest.conferenceDate).toLocaleDateString('pt-BR')}`, 20, 152);
+    doc.text(`DATA: ${formatDateBR(manifest.conferenceDate)}`, 20, 152);
     doc.text(`CONFERENTE: ${manifest.checkerName}`, 20, 160);
 
     // Pallet Info
@@ -152,7 +153,7 @@ export const buildLoadingManifestDoc = async (data: LoadingManifest): Promise<js
   doc.setFont('helvetica', 'normal');
   doc.text(`UNIDADE ORIGEM: ${data.cdName}`, 15, 60);
   doc.text(`FILIAL DESTINO: ${data.branchName}`, 15, 66);
-  doc.text(`DATA PREVISTA ENTREGA: ${new Date(data.deliveryDate).toLocaleDateString('pt-BR')}`, 15, 72);
+  doc.text(`DATA PREVISTA ENTREGA: ${formatDateBR(data.deliveryDate)}`, 15, 72);
   doc.text(`NÚMERO DO LACRE: ${data.sealNumber || 'NÃO INFORMADO'}`, 15, 78);
   doc.setFont('helvetica', 'bold');
   doc.text(`HORÁRIO DE SAÍDA: ${data.exitTime}`, pageWidth - 70, 60);

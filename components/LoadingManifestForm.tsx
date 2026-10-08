@@ -28,6 +28,7 @@ import {
   Manifest
 } from '../types';
 import { generateLoadingManifestPDF } from '../services/pdfGenerator';
+import { getLocalDateString } from '../services/dateUtils';
 
 interface LoadingManifestFormProps {
   drivers: Driver[];
@@ -55,7 +56,7 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
     driverId: '',
     vehicleId: '',
     sealNumber: '',
-    deliveryDate: new Date().toISOString().split('T')[0],
+    deliveryDate: getLocalDateString(),
     exitTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
   });
 
@@ -180,7 +181,13 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
       onSave(manifestData);
       setInvoices([]);
       setSelectedManifestIds([]);
-      setFormData({ ...formData, manifestNumber: `MC-${Date.now().toString().substr(-6)}`, sealNumber: '', exitTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) });
+      setFormData({ 
+        ...formData, 
+        manifestNumber: `MC-${Date.now().toString().substr(-6)}`, 
+        sealNumber: '', 
+        deliveryDate: getLocalDateString(),
+        exitTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) 
+      });
     } catch (e) { setError("Erro ao salvar."); }
     finally { setIsGenerating(false); }
   };

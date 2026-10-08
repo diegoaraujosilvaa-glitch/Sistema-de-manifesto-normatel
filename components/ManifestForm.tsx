@@ -21,6 +21,7 @@ import {
   Manifest 
 } from '../types';
 import { generateManifestPDF } from '../services/pdfGenerator';
+import { getLocalDateString } from '../services/dateUtils';
 
 interface ManifestFormProps {
   checkers: Checker[];
@@ -52,7 +53,7 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
   const [formData, setFormData] = useState({
     manifestNumber: '',
     orders: '',
-    conferenceDate: new Date().toISOString().split('T')[0],
+    conferenceDate: getLocalDateString(),
     cdId: cds[0]?.id || '',
     branchId: '',
     checkerId: '',

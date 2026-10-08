@@ -75,6 +75,7 @@ import {
   saveUser,
   deleteUser
 } from './services/firestoreService';
+import { formatDateBR } from './services/dateUtils';
 
 const LogoNormatel = ({ size = 40, className = "" }) => (
   <div className={`relative inline-block ${className}`} style={{ width: size, height: size }}>
@@ -507,7 +508,7 @@ const App: React.FC = () => {
                         </span>
                       </td>
                       <td className="p-6 font-bold text-slate-400 text-[10px]">
-                        {m.deliveryDate ? new Date(m.deliveryDate).toLocaleDateString('pt-BR') : '-'}
+                        {m.deliveryDate ? formatDateBR(m.deliveryDate) : '-'}
                       </td>
                       <td className="p-6 text-center">
                         <div className="flex justify-center gap-2">

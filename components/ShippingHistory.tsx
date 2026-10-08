@@ -29,6 +29,7 @@ import {
 import { LoadingManifest, Manifest, Branch, UserProfile, InvoiceItem } from '../types';
 import { generateLoadingManifestPDF, getLoadingManifestPDFBlob } from '../services/pdfGenerator';
 import { updateLoadingManifestEmailSent } from '../services/firestoreService';
+import { formatDateBR } from '../services/dateUtils';
 
 interface ShippingHistoryProps {
   loadingManifests: LoadingManifest[];
@@ -134,8 +135,8 @@ DADOS DO TRANSPORTE:
 - Veículo (Placa): ${m.vehiclePlate}
 - Motorista: ${m.driverName}
 - Nº do Lacre: ${m.sealNumber || 'NÃO INFORMADO'}
-- Data de Saída: ${new Date(m.createdAt).toLocaleDateString('pt-BR')} às ${m.exitTime}
-- Previsão de Entrega: ${new Date(m.deliveryDate).toLocaleDateString('pt-BR')}
+- Data de Saída: ${formatDateBR(m.createdAt)} às ${m.exitTime}
+- Previsão de Entrega: ${formatDateBR(m.deliveryDate)}
 - Quantidade de NFs: ${m.invoices?.length || 0} nota(s) fiscal(is)
 
 RELAÇÃO DE NOTAS FISCAIS EMBARCADAS:
@@ -189,8 +190,8 @@ DADOS DO TRANSPORTE:
 • Veículo / Placa: ${m.vehiclePlate}
 • Motorista: ${m.driverName}
 • Lacre: ${m.sealNumber || 'NÃO INFORMADO'}
-• Saída: ${new Date(m.createdAt).toLocaleDateString('pt-BR')} às ${m.exitTime}
-• Previsão de Entrega: ${new Date(m.deliveryDate).toLocaleDateString('pt-BR')}
+• Saída: ${formatDateBR(m.createdAt)} às ${m.exitTime}
+• Previsão de Entrega: ${formatDateBR(m.deliveryDate)}
 • Quantidade de NFs: ${m.invoices?.length || 0} nota(s) fiscal(is)
 
 (O PDF do Manifesto de Carga foi baixado e a lista completa de NFs foi copiada para área de transferência).
@@ -315,7 +316,7 @@ Expedição / Logística`;
       inv.loadingManifestNumber,
       inv.manifestPalletNumber,
       `"${inv.branchName}"`,
-      new Date(inv.createdAt).toLocaleDateString('pt-BR'),
+      formatDateBR(inv.createdAt),
       inv.exitTime,
       inv.vehiclePlate,
       `"${inv.driverName}"`,
@@ -612,7 +613,7 @@ Expedição / Logística`;
 
                         {/* Date and Exit Time */}
                         <td className="p-5 text-slate-600 font-medium">
-                          <div>{new Date(inv.createdAt).toLocaleDateString('pt-BR')}</div>
+                          <div>{formatDateBR(inv.createdAt)}</div>
                           <div className="text-[10px] text-slate-400 font-bold">{inv.exitTime || '-'}</div>
                         </td>
 
@@ -718,7 +719,7 @@ Expedição / Logística`;
                       </div>
                     </td>
                     <td className="p-6 text-slate-500 font-bold text-xs">
-                      <div>{new Date(m.createdAt).toLocaleDateString('pt-BR')}</div>
+                      <div>{formatDateBR(m.createdAt)}</div>
                       <div className="text-[10px] text-slate-400 font-normal">{m.exitTime || '-'}</div>
                     </td>
                     <td className="p-6">
@@ -888,7 +889,11 @@ Expedição / Logística`;
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-bold">Data de Saída:</span>
-                      <span className="font-bold text-slate-800">{new Date(selectedInvoice.createdAt).toLocaleDateString('pt-BR')} às {selectedInvoice.exitTime}</span>
+                      <span className="font-bold text-slate-800">{formatDateBR(selectedInvoice.createdAt)} às {selectedInvoice.exitTime}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-bold">Previsão Entrega:</span>
+                      <span className="font-bold text-slate-800">{formatDateBR(selectedInvoice.deliveryDate)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400 font-bold">Lacre:</span>
@@ -1033,7 +1038,7 @@ Expedição / Logística`;
             {/* Modal Body */}
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* Header Info Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Destino</span>
                   <span className="text-xs font-black text-slate-800 truncate block">{selectedLoadingManifest.branchName}</span>
@@ -1045,6 +1050,10 @@ Expedição / Logística`;
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Motorista</span>
                   <span className="text-xs font-bold text-slate-800 truncate block">{selectedLoadingManifest.driverName}</span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Previsão Entrega</span>
+                  <span className="text-xs font-black text-slate-800 block">{formatDateBR(selectedLoadingManifest.deliveryDate)}</span>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-1">Lacre</span>
