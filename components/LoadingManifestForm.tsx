@@ -28,7 +28,7 @@ import {
   Manifest
 } from '../types';
 import { generateLoadingManifestPDF } from '../services/pdfGenerator';
-import { getLocalDateString } from '../services/dateUtils';
+import { getLocalDateString, formatDateBR } from '../services/dateUtils';
 
 interface LoadingManifestFormProps {
   drivers: Driver[];
@@ -235,7 +235,14 @@ const LoadingManifestForm: React.FC<LoadingManifestFormProps> = ({
               </div>
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Data Prevista de Entrega *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Prevista de Entrega *</label>
+                {formData.deliveryDate && (
+                  <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200">
+                    No Romaneio: {formatDateBR(formData.deliveryDate)}
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <Calendar className="absolute left-4 top-4 text-slate-400" size={16} />
                 <input type="date" className="w-full pl-12 p-4 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-bold" value={formData.deliveryDate} onChange={e => setFormData({...formData, deliveryDate: e.target.value})} />

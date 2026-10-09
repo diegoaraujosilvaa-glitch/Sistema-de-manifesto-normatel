@@ -19,25 +19,40 @@ export const getLocalDateString = (date = new Date()): string => {
  * Formats any date string (YYYY-MM-DD or ISO timestamp) to Brazilian format DD/MM/YYYY.
  * Prevents timezone shifting for pure date strings like deliveryDate and conferenceDate.
  */
-export const formatDateBR = (dateStr?: string | null): string => {
-  if (!dateStr) return '-';
-  const str = String(dateStr).trim();
+export const formatDateBR = (dateInput?: string | Date | null | any): string => {
+  if (!dateInput) return '-';
 
-  // If in YYYY-MM-DD format (standard HTML date input value)
-  const dateOnlyMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (dateOnlyMatch) {
-    const [, year, month, day] = dateOnlyMatch;
+  // 1. If it's a Firestore Timestamp or object with toDate
+  let val = dateInput;
+  if (typeof val === 'object' && val !== null && typeof val.toDate === 'function') {
+    val = val.toDate();
+  }
+
+  // 2. If it's a Date instance
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return '-';
+    const day = String(val.getDate()).padStart(2, '0');
+    const month = String(val.getMonth() + 1).padStart(2, '0');
+    const year = val.getFullYear();
     return `${day}/${month}/${year}`;
   }
 
-  // If in YYYY-MM-DDT00:00:00... format (UTC midnight representation of a date)
-  const midnightMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})T00:00:00/);
-  if (midnightMatch) {
-    const [, year, month, day] = midnightMatch;
+  const str = String(val).trim();
+  if (!str) return '-';
+
+  // 3. If it's already in Brazilian DD/MM/YYYY format
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+    return str;
+  }
+
+  // 4. If it contains a date pattern YYYY-MM-DD (e.g. standard HTML date input, ISO, etc.)
+  const ymdMatch = str.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch;
     return `${day}/${month}/${year}`;
   }
 
-  // If ISO string with timestamp (e.g. createdAt: 2026-10-08T14:35:10.000Z)
+  // 5. Fallback for other parseable date formats
   const d = new Date(str);
   if (!isNaN(d.getTime())) {
     return d.toLocaleDateString('pt-BR');
