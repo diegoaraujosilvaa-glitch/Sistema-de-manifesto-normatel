@@ -27,7 +27,8 @@ interface ManifestFormProps {
   checkers: Checker[];
   branches: Branch[];
   cds: DistributionCenter[];
-  onSave: (manifest: Omit<Manifest, 'id'>) => void;
+  existingManifests?: Manifest[];
+  onSave: (manifest: Omit<Manifest, 'id'>) => Promise<void> | void;
   currentUser: { name: string; uid: string };
 }
 
@@ -36,7 +37,8 @@ const CONFERENCE_TYPES = [
   'VENDAS LOJA',
   'MOSTRUARIO',
   'AVARIA',
-  'OCORRÊNCIA'
+  'OCORRÊNCIA',
+  'CROSS DOCKING'
 ];
 
 const SPECIAL_PRODUCTS = [
@@ -47,6 +49,7 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
   checkers, 
   branches, 
   cds, 
+  existingManifests = [],
   onSave,
   currentUser
 }) => {
@@ -100,9 +103,20 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
     }));
   };
 
+  const normalizedManifestNumber = formData.manifestNumber.trim().toUpperCase();
+  const isDuplicateNumber = Boolean(
+    normalizedManifestNumber &&
+    existingManifests.some(
+      m => (m.manifestNumber || '').trim().toUpperCase() === normalizedManifestNumber
+    )
+  );
+
   const validate = () => {
-    if (!formData.manifestNumber) return "Nº Manifesto obrigatório";
-    if (!formData.orders) return "Lista de pedidos obrigatória";
+    if (!normalizedManifestNumber) return "Nº Manifesto obrigatório";
+    if (isDuplicateNumber) {
+      return `Já existe um manifesto cadastrado com a numeração "${normalizedManifestNumber}". Utilize outro número para evitar duplicidade.`;
+    }
+    if (!formData.orders.trim()) return "Lista de pedidos obrigatória";
     if (!formData.branchId) return "Filial obrigatória";
     if (!formData.checkerId) return "Conferente obrigatório";
     return null;
@@ -114,6 +128,7 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
     const checker = checkers.find(c => c.id === formData.checkerId);
     return {
       ...formData,
+      manifestNumber: normalizedManifestNumber,
       status: 'PENDENTE',
       createdAt: new Date().toISOString(),
       createdBy: currentUser.name,
@@ -147,10 +162,10 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
     setIsGenerating(true);
     try {
       const manifestData = constructManifest();
+      await onSave(manifestData);
       // For PDF generation, we add a dummy ID if needed, but generateManifestPDF should handle it
       const manifest = { ...manifestData, id: 'temp' } as Manifest;
       await generateManifestPDF(manifest, false);
-      onSave(manifestData);
       setFormData({ 
         ...formData, 
         manifestNumber: '', 
@@ -158,8 +173,11 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
         palletsCount: 1, 
         specialProducts: [] 
       });
-    } catch (e) { setError("Erro ao salvar."); }
-    finally { setIsGenerating(false); }
+    } catch (e: any) {
+      setError(e?.message || "Erro ao salvar manifesto.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -186,7 +204,25 @@ const ManifestForm: React.FC<ManifestFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Número do Manifesto *</label>
-                <input type="text" placeholder="EX: 990123" className="w-full px-5 py-4 bg-slate-50 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none transition-all font-black text-slate-700 uppercase" value={formData.manifestNumber} onChange={e => setFormData({ ...formData, manifestNumber: e.target.value.toUpperCase() })} />
+                <input 
+                  type="text" 
+                  placeholder="EX: 990123" 
+                  className={`w-full px-5 py-4 bg-slate-50 rounded-2xl focus:ring-2 outline-none transition-all font-black uppercase ${
+                    isDuplicateNumber 
+                      ? 'border-2 border-red-400 bg-red-50/50 text-red-700 focus:ring-red-500' 
+                      : 'text-slate-700 focus:ring-orange-500'
+                  }`} 
+                  value={formData.manifestNumber} 
+                  onChange={e => {
+                    setError(null);
+                    setFormData({ ...formData, manifestNumber: e.target.value.toUpperCase() });
+                  }} 
+                />
+                {isDuplicateNumber && (
+                  <p className="mt-1.5 text-[10px] font-bold text-red-600 flex items-center gap-1">
+                    <AlertCircle size={12} /> Numeração já existente! Informe outro número.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo de Conferência *</label>

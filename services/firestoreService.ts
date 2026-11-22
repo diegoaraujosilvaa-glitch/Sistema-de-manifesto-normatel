@@ -10,7 +10,9 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
-  setDoc
+  setDoc,
+  getDocs,
+  where
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
 import { 
@@ -115,13 +117,34 @@ export const subscribeToLoadingManifests = (callback: (data: LoadingManifest[]) 
 };
 
 export const saveManifest = async (manifest: Omit<Manifest, 'id'>) => {
+  const normalizedNumber = (manifest.manifestNumber || '').trim().toUpperCase();
+  if (!normalizedNumber) {
+    throw new Error('Nº do manifesto é obrigatório.');
+  }
+
   try {
+    const duplicateQuery = query(
+      collection(db, "manifests"),
+      where("manifestNumber", "==", normalizedNumber),
+      limit(1)
+    );
+    const existingSnap = await getDocs(duplicateQuery);
+    if (!existingSnap.empty) {
+      const dupError = new Error(`Já existe um manifesto com a numeração "${normalizedNumber}". Utilize outro número para evitar duplicidade.`);
+      (dupError as any).code = 'DUPLICATE_MANIFEST';
+      throw dupError;
+    }
+
     const docRef = await addDoc(collection(db, "manifests"), {
       ...manifest,
+      manifestNumber: normalizedNumber,
       createdAt: serverTimestamp(),
     });
     return docRef.id;
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'DUPLICATE_MANIFEST') {
+      throw error;
+    }
     handleFirestoreError(error, OperationType.CREATE, "manifests");
   }
 };

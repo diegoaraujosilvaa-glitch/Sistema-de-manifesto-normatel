@@ -60,3 +60,61 @@ export const formatDateBR = (dateInput?: string | Date | null | any): string => 
 
   return str;
 };
+
+/**
+ * Formats an ISO creation timestamp (createdAt) to Brazilian DD/MM/YYYY in local timezone.
+ * Falls back to formatDateBR if the string is date-only.
+ */
+export const formatTimestampDateBR = (dateInput?: string | Date | null | any): string => {
+  if (!dateInput) return '-';
+
+  let val = dateInput;
+  if (typeof val === 'object' && val !== null && typeof val.toDate === 'function') {
+    val = val.toDate();
+  }
+
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? '-' : val.toLocaleDateString('pt-BR');
+  }
+
+  const str = String(val).trim();
+  if (!str) return '-';
+
+  // Pure date string or midnight UTC -> preserve exact calendar date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str) || /^\d{4}-\d{2}-\d{2}T00:00:00/.test(str)) {
+    return formatDateBR(str);
+  }
+
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString('pt-BR');
+  }
+
+  return formatDateBR(str);
+};
+
+/**
+ * Formats the time (HH:mm) from an ISO creation timestamp in local timezone.
+ */
+export const formatTimestampTimeBR = (dateInput?: string | Date | null | any): string | null => {
+  if (!dateInput) return null;
+
+  let val = dateInput;
+  if (typeof val === 'object' && val !== null && typeof val.toDate === 'function') {
+    val = val.toDate();
+  }
+
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : val.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const str = String(val).trim();
+  if (!str || /^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
+
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  return null;
+};

@@ -75,7 +75,7 @@ import {
   saveUser,
   deleteUser
 } from './services/firestoreService';
-import { formatDateBR } from './services/dateUtils';
+import { formatDateBR, formatTimestampDateBR, formatTimestampTimeBR } from './services/dateUtils';
 
 const LogoNormatel = ({ size = 40, className = "" }) => (
   <div className={`relative inline-block ${className}`} style={{ width: size, height: size }}>
@@ -389,11 +389,14 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard manifests={manifests} dateRange={dateRange} setDateRange={setDateRange} />;
-      case 'generate': return <ManifestForm checkers={checkers} branches={branches} cds={cds} onSave={async m => {
+      case 'generate': return <ManifestForm checkers={checkers} branches={branches} cds={cds} existingManifests={manifests} onSave={async m => {
         try {
           await saveManifest(m);
-        } catch (e) {
-          alert('Erro ao salvar manifesto no Firebase');
+        } catch (e: any) {
+          if (e?.code === 'DUPLICATE_MANIFEST') {
+            throw e;
+          }
+          throw new Error('Erro ao salvar manifesto no Firebase');
         }
       }} currentUser={user} />;
       case 'loading-manifest': 
@@ -477,6 +480,7 @@ const App: React.FC = () => {
                     <th className="p-6">Origem</th>
                     <th className="p-6 text-center">Paletes</th>
                     <th className="p-6">Status</th>
+                    <th className="p-6">Criação</th>
                     <th className="p-6">Entrega</th>
                     <th className="p-6 text-center">Ação</th>
                   </tr>
@@ -506,6 +510,14 @@ const App: React.FC = () => {
                         <span className={`px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase ${m.status === 'ENTREGUE' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                           {m.status || 'PENDENTE'}
                         </span>
+                      </td>
+                      <td className="p-6 font-bold text-slate-600 text-[11px] not-italic">
+                        <div>{m.createdAt ? formatTimestampDateBR(m.createdAt) : '-'}</div>
+                        {m.createdAt && formatTimestampTimeBR(m.createdAt) && (
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            {formatTimestampTimeBR(m.createdAt)}
+                          </div>
+                        )}
                       </td>
                       <td className="p-6 font-bold text-slate-400 text-[10px]">
                         {m.deliveryDate ? formatDateBR(m.deliveryDate) : '-'}
